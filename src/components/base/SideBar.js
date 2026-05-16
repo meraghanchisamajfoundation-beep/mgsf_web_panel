@@ -15,6 +15,7 @@ import {
   FiX
 } from 'react-icons/fi';
 import { useAuth } from '@/lib/AuthProvider';
+import { TrustData } from '../screen/settings/organization';
 
 const SideBar = ({ collapsed, onClose }) => {
   const pathname = usePathname();
@@ -184,12 +185,14 @@ const SideBar = ({ collapsed, onClose }) => {
           ${collapsed ? 'justify-center' : 'gap-3'}
         `}>
           {/* Mobile close btn — only on small screens, handled by parent */}
-          <div className="logo-icon w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0">
-            <FiLayers size={20} className="text-white" />
+          <div className=" w-12 h-12 flex items-center justify-center flex-shrink-0">
+        {
+           <img src={"/images/meraghanchiLogo.png"} alt="Logo" className="w-full h-full" /> 
+        } 
           </div>
           {!collapsed && (
             <div>
-              <h2 className="font-bold text-white text-base leading-tight tracking-tight">Trust Manager</h2>
+              <h2 className="font-bold text-white text-base leading-tight tracking-tight">MGSF ADMIN</h2>
               <p className="text-xs text-slate-500 mt-0.5">Admin Panel</p>
             </div>
           )}
