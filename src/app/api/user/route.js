@@ -37,17 +37,28 @@ export async function POST(req) {
       return NextResponse.json({ success: true });
     }
 
-    if (action === "checkEmail") {
-      try {
-        await admin.auth().getUserByEmail(email);
-        return NextResponse.json({ exists: true });
-      } catch (err) {
-        if (err.code === "auth/user-not-found") {
-          return NextResponse.json({ exists: false });
-        }
-        return NextResponse.json({ error: err.message }, { status: 500 });
-      }
+if (action === "checkEmail") {
+  try {
+    // 1. Check Firebase Auth
+    await admin.auth().getUserByEmail(email);
+
+    // 2. Check Firestore users collection
+    const db = admin.firestore();
+    const usersRef = db.collection("users");
+    const snapshot = await usersRef.where("email", "==", email).limit(1).get();
+
+    if (snapshot.empty) {
+      return NextResponse.json({ exists: false });
     }
+
+    return NextResponse.json({ exists: true });
+  } catch (err) {
+    if (err.code === "auth/user-not-found") {
+      return NextResponse.json({ exists: false });
+    }
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch (error) {
