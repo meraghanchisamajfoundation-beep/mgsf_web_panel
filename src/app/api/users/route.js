@@ -1,8 +1,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
-import admin from "../../admin";
+
 import { getAuth } from "firebase/auth";
-import { verifyAdmin } from "../../helperfile/commonFun";
+
+import admin from "../admin";
+import { verifyAdmin } from "../helperfile/commonFun";
 const adminAuth = getAuth(admin)
 export async function GET(req) {
 
