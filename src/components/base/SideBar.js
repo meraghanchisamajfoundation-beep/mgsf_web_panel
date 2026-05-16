@@ -187,7 +187,7 @@ const SideBar = ({ collapsed, onClose }) => {
           {/* Mobile close btn — only on small screens, handled by parent */}
           <div className=" w-12 h-12 flex items-center justify-center flex-shrink-0">
         {
-           <img src={"/images/meraghanchiLogo.png"} alt="Logo" className="w-full h-full" /> 
+           <img src={"/Images/meraghanchiLogo.png"} alt="Logo" className="w-full h-full" /> 
         } 
           </div>
           {!collapsed && (

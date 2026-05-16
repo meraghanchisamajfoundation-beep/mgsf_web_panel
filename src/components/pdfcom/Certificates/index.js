@@ -8,7 +8,7 @@ const CertificateViewer = ({memberData,selectedProgram,TrustData}) => {
 
   return (
     <PDFViewer style={{ width: '100%', height: '100vh', border: 'none' }}>
-      <Certificate data={memberData} selectedProgram={selectedProgram} TrustData={TrustData} />
+      <CertificateServerSide data={memberData} selectedProgram={selectedProgram} TrustData={TrustData} />
       {/* <Certificate data={memberData} selectedProgram={selectedProgram} TrustData={TrustData} /> */}
     </PDFViewer>
   );
