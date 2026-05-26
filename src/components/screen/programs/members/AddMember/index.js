@@ -28,10 +28,28 @@ import { checkAadhaarExists, createMemberInTransaction, generateUnique4Digit, se
 import { districtsByState, gender, states } from '@/lib/staticData';
 import { setgetMemberDataChange } from '@/redux/slices/commonSlice';
 import { createMemberAccount, generateMemberPassword } from '@/lib/commonFun';
+import { where } from 'firebase/firestore';
 
 const { Option } = Select;
 const { TextArea } = Input;
 const { Title, Text } = Typography;
+
+// Guardian relations dropdown options
+const guardianRelations = [
+  { value: "पिता-पुत्र", label: "पिता-पुत्र" },
+  { value: "पिता-पुत्री", label: "पिता-पुत्री" },
+  { value: "माता-पुत्र", label: "माता-पुत्र" },
+  { value: "माता-पुत्री", label: "माता-पुत्री" },
+  { value: "भाई-भाई", label: "भाई-भाई" },
+  { value: "भाई-बहिन", label: "भाई-बहिन" },
+  { value: "बहिन-बहिन", label: "बहिन-बहिन" },
+  { value: "मामा-भाणेज", label: "मामा-भाणेज" },
+  { value: "मामा-भाणेजी", label: "मामा-भाणेजी" },
+  { value: "नाना-दोहिता", label: "नाना-दोहिता" },
+  { value: "नाना-दोहिती", label: "नाना-दोहिती" },
+  { value: "मामी-ननदोइता", label: "मामी-ननदोइता" },
+  { value: "मामी-ननदोइती", label: "मामी-ननदोइती" }
+];
 
 const AddMember = () => {
   const programList = useSelector((state) => state.data.programList || []);
@@ -78,7 +96,14 @@ const AddMember = () => {
   // Store original birth date and join date
   const [storedBirthDate, setStoredBirthDate] = useState(null);
   const [storedJoinDate, setStoredJoinDate] = useState(dayjs());
-const [closingDays, setClosingDays] = useState(null);
+  const [closingDays, setClosingDays] = useState(null);
+  
+  // Application number state
+  const [applicationNumber, setApplicationNumber] = useState('');
+  const [isApplicationNumberChecking, setIsApplicationNumberChecking] = useState(false);
+  const [applicationNumberError, setApplicationNumberError] = useState(null);
+  const [nextApplicationNumber, setNextApplicationNumber] = useState(5501);
+  
   // Reset form when drawer opens
   useEffect(() => {
     if (open) {
@@ -105,15 +130,67 @@ const [closingDays, setClosingDays] = useState(null);
       setStoredJoinDate(dayjs());
       setJoinFeesPaymentType(null);
       setCustomJoinFeesAmount(1100);
+      setApplicationNumber('');
+      setApplicationNumberError(null);
       // Set default join date to today
       form.setFieldsValue({
-        dateJoin: dayjs()
+        dateJoin: dayjs(),
+        jati: 'प्रजापत',
+        applicationNumber: ''
       });
+      
+      // Fetch the next application number
+      fetchNextApplicationNumber();
     }
   }, [open, form]);
 
+  // Function to fetch the next application number
+ const fetchNextApplicationNumber = async () => {
+  try {
+    const programId = form.getFieldValue('program');
+    if (!programId || !user?.uid) return;
+    
+    const memberCollectionPath = `/users/${user.uid}/programs/${programId}/members`;
+    
+    // Get all members with ordering by applicationNumber descending
+    const members = await getData(
+      memberCollectionPath,
+      [
+        { field: 'delete_flag', operator: '==', value: false },
+      ],
+      { field: 'applicationNumber', direction: 'desc' },
+      1 // Only get the highest one
+    );
+    
+    let maxAppNumber = 5500; // Start from 5500 as base
+    console.log(members,'members')
+    if (members && members.length > 0) {
+      const highestMember = members[0];
+      if (highestMember.applicationNumber ) {
+        maxAppNumber = parseInt(highestMember.applicationNumber);
+        console.log('Found max application number:', maxAppNumber);
+      }
+    }
+    
+    const nextNumber = maxAppNumber + 1;
+  
+    
+    setNextApplicationNumber(nextNumber);
+    setApplicationNumber(nextNumber.toString());
+    form.setFieldsValue({ applicationNumber: nextNumber.toString() });
+    
+  } catch (error) {
+    console.error('Error fetching next application number:', error);
+    // Fallback
+    const fallbackNumber = 5501;
+    setNextApplicationNumber(fallbackNumber);
+    setApplicationNumber(fallbackNumber.toString());
+    form.setFieldsValue({ applicationNumber: fallbackNumber.toString() });
+  }
+};
+
   // Handle program selection
-  const handleProgramSelect = (programId) => {
+  const handleProgramSelect = async (programId) => {
     const program = programList.find(p => p.id === programId);
     setSelectedProgram(program);
 
@@ -139,6 +216,9 @@ const [closingDays, setClosingDays] = useState(null);
       setPayAmount(0);
       setJoinFees(0);
     }
+    
+    // Fetch next application number for this program
+    await fetchNextApplicationNumber();
   };
 
   // Recalculate age group when program or dates change
@@ -204,7 +284,6 @@ const [closingDays, setClosingDays] = useState(null);
       const allMembers = [];
       
       for (const program of programList) {
-
         const programDocPath = `/users/${user.uid}/programs/${program.id}`;
         const members = await getData(`${programDocPath}/members`);
         
@@ -254,11 +333,12 @@ const [closingDays, setClosingDays] = useState(null);
       guardian: member.guardian,
       gender: member.gender,
       guardianRelation: member.guardianRelation,
-      jati: member.jati,
+      jati: member.jati || 'प्रजापत',
       gotra: member.gotra || '',
       phone: member.phone,
       phoneAlt: member.phoneAlt || '',
       aadhaarNo: member.aadhaarNo,
+      guardianAadharNo: member.guardianAadharNo || '',
       bobDate: birthDate,
       currentAddress: member.currentAddress,
       village: member.village,
@@ -342,6 +422,106 @@ const [closingDays, setClosingDays] = useState(null);
     }
   };
 
+  // Handle Application Number validation
+const checkApplicationNumberDuplicate = async (appNumber, programId) => {
+  try {
+    if (!appNumber || !programId) return false;
+
+    const appNumberNum = Number(appNumber);
+
+    if (isNaN(appNumberNum)) return false;
+
+    const memberCollectionPath = `/users/${user.uid}/programs/${programId}/members`;
+
+    const members = await getData(
+      memberCollectionPath,
+      [
+        {
+          field: "applicationNumber",
+          operator: "==",
+          value: appNumberNum.toString(),
+        },
+        {
+          field: "delete_flag",
+          operator: "!=",
+          value: true,
+        },
+      ],
+      null,
+      1
+    );
+
+    console.log(members,"members1234",appNumberNum)
+
+    return members.length > 0;
+  } catch (error) {
+    console.log("Duplicate check error:", error);
+    return false;
+  }
+};
+
+  const handleApplicationNumberBlur = async (e) => {
+    const appNumber = e.target.value;
+    
+    if (!appNumber) {
+      setApplicationNumberError(null);
+      form.setFields([{ name: 'applicationNumber', errors: [] }]);
+      return;
+    }
+    
+    // Check if it's a number
+    const appNumberNum = parseInt(appNumber);
+    if (isNaN(appNumberNum)) {
+      setApplicationNumberError('कृपया मान्य संख्या दर्ज करें');
+      form.setFields([
+        {
+          name: 'applicationNumber',
+          errors: ['कृपया मान्य संख्या दर्ज करें'],
+        },
+      ]);
+      return;
+    }
+    
+    const programId = form.getFieldValue('program');
+    if (!programId) {
+      message.warning('कृपया पहले कार्यक्रम का चयन करें।');
+      return;
+    }
+    
+    setIsApplicationNumberChecking(true);
+    setApplicationNumberError(null);
+    
+    try {
+      const isDuplicate = await checkApplicationNumberDuplicate(appNumber, programId);
+      
+      if (isDuplicate) {
+        const errorMessage = `एप्लीकेशन नंबर ${appNumber} पहले से मौजूद है। कृपया दूसरा नंबर दर्ज करें।`;
+        setApplicationNumberError(errorMessage);
+        form.setFields([
+          {
+            name: 'applicationNumber',
+            errors: [errorMessage],
+          },
+        ]);
+        message.error(errorMessage);
+      } else {
+        setApplicationNumberError(null);
+        form.setFields([
+          {
+            name: 'applicationNumber',
+            errors: [],
+          },
+        ]);
+        message.success('एप्लीकेशन नंबर उपलब्ध है');
+      }
+    } catch (error) {
+      console.error('Error checking application number:', error);
+      message.error('एप्लीकेशन नंबर सत्यापन में विफल');
+    } finally {
+      setIsApplicationNumberChecking(false);
+    }
+  };
+  
   // Calculate age
   const getDecimalAge = (birthDate, joinDate) => {
     return dayjs(joinDate)
@@ -453,6 +633,30 @@ const [closingDays, setClosingDays] = useState(null);
     
     const aadhaarNo = values.aadhaarNo;
     const programId = values.program;
+    const applicationNumberValue = parseInt(values.applicationNumber);
+    
+    // Validate application number
+    if (isNaN(applicationNumberValue)) {
+      message.error('कृपया मान्य एप्लीकेशन नंबर दर्ज करें');
+      setLoading(false);
+      return;
+    }
+    
+    // Check if application number already exists - FINAL CHECK before submission
+    try {
+      const isDuplicate = await checkApplicationNumberDuplicate(values.applicationNumber, programId);
+      
+      if (isDuplicate) {
+        message.error(`एप्लीकेशन नंबर ${values.applicationNumber} पहले से मौजूद है। कृपया दूसरा नंबर दर्ज करें।`);
+        setLoading(false);
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking application number:', error);
+      message.error('एप्लीकेशन नंबर सत्यापन में विफल');
+      setLoading(false);
+      return;
+    }
     
     if (aadhaarNo && programId) {
       try {
@@ -570,11 +774,13 @@ const [closingDays, setClosingDays] = useState(null);
         guardian: values.guardian,
         gender: values?.gender,
         guardianRelation: values.guardianRelation,
-        jati: values.jati,
+        jati: values.jati || 'प्रजापत',
         gotra: values.gotra || '',
         phone: values.phone,
         phoneAlt: values.phoneAlt || '',
         aadhaarNo: values.aadhaarNo,
+        guardianAadharNo: values.guardianAadharNo || '',
+        applicationNumber: parseInt(values.applicationNumber),
         bobDate: values.bobDate.format('DD-MM-YYYY'),
         currentAddress: values.currentAddress,
         village: values.village,
@@ -592,15 +798,15 @@ const [closingDays, setClosingDays] = useState(null);
         locactionGroupId: selectedLocationGroup?.id || '',
         payAmount: payAmount,
         joinFees: joinFees,
-       joinFeesDone: values?.joinFeesDone || false,
-joinFeesTxtId: values?.joinFeesTxtId || "",
-joinFeesPaymentType: values?.joinFeesPaymentType || "",
-joinFeesPaidAmount: values?.joinFeesPaymentType === 'custom' 
-  ? (values?.customJoinFeesAmount || 0) 
-  : (values?.joinFeesPaymentType === 'full' ? joinFees : 0),
-joinFeesRemainingAmount: values?.joinFeesPaymentType === 'custom' && values?.customJoinFeesAmount 
-  ? (joinFees - values.customJoinFeesAmount) 
-  : (values?.joinFeesPaymentType === 'full' ? 0 : joinFees),
+        joinFeesDone: values?.joinFeesDone || false,
+        joinFeesTxtId: values?.joinFeesTxtId || "",
+        joinFeesPaymentType: values?.joinFeesPaymentType || "",
+        joinFeesPaidAmount: values?.joinFeesPaymentType === 'custom' 
+          ? (values?.customJoinFeesAmount || 0) 
+          : (values?.joinFeesPaymentType === 'full' ? joinFees : 0),
+        joinFeesRemainingAmount: values?.joinFeesPaymentType === 'custom' && values?.customJoinFeesAmount 
+          ? (joinFees - values.customJoinFeesAmount) 
+          : (values?.joinFeesPaymentType === 'full' ? 0 : joinFees),
         role: 'member',
         addedBy: values.addedBy,
         addedByName: values.addedBy === 'agent' ? agentName : 'Admin',
@@ -633,26 +839,24 @@ joinFeesRemainingAmount: values?.joinFeesPaymentType === 'custom' && values?.cus
       );
 
       try {
-  await createMemberAccount({
-    memberId: result.id,
-    displayName: values.displayName,
-    photoURL: fileUrls.photo?.url || "",
-    password: generateMemberPassword(values.displayName, values.bobDate.format('DD-MM-YYYY')) || "Member@123", // optional
-    programId: values.program,
-    registrationNumber: result.registrationNumber,
-    memberCollectionPath: memberCollectionPath,
-    createdBy: user.uid
-  });
+        await createMemberAccount({
+          memberId: result.id,
+          displayName: values.displayName,
+          photoURL: fileUrls.photo?.url || "",
+          password: generateMemberPassword(values.displayName, values.bobDate.format('DD-MM-YYYY')) || "Member@123",
+          programId: values.program,
+          registrationNumber: result.registrationNumber,
+          memberCollectionPath: memberCollectionPath,
+          createdBy: user.uid
+        });
 
-  console.log("Member auth created");
-} catch (authError) {
-  console.error("Auth creation failed:", authError);
-
-  // optional rollback warning only
-  message.warning(
-    "Member added successfully, but login account creation failed."
-  );
-}
+        console.log("Member auth created");
+      } catch (authError) {
+        console.error("Auth creation failed:", authError);
+        message.warning(
+          "Member added successfully, but login account creation failed."
+        );
+      }
 
       const agentToken = getAgentToken(agentIdToUpdate);
 
@@ -660,10 +864,7 @@ joinFeesRemainingAmount: values?.joinFeesPaymentType === 'custom' && values?.cus
         await sendFirebaseNotification(
           agentToken,
           'नया सदस्य जोड़ दिया गया',
-          `${values.displayName} को नया सदस्य बना दिया गया है।
-मोबाइल: ${values.phone}
-गाँव: ${values.village}
-योजना: ${selectedProgram?.name}`
+          `${values.displayName} को नया सदस्य बना दिया गया है।\nमोबाइल: ${values.phone}\nगाँव: ${values.village}\nयोजना: ${selectedProgram?.name}\nएप्लीकेशन नंबर: ${values.applicationNumber}`
         );
       }
 
@@ -715,7 +916,7 @@ joinFeesRemainingAmount: values?.joinFeesPaymentType === 'custom' && values?.cus
               onClick={() => form.submit()}
               type="primary"
               loading={loading}
-              disabled={!selectedProgram || loading}
+              disabled={!selectedProgram || loading || applicationNumberError !== null}
               size="large"
               icon={loading ? <LoadingOutlined /> : null}
             >
@@ -742,7 +943,8 @@ joinFeesRemainingAmount: values?.joinFeesPaymentType === 'custom' && values?.cus
             initialValues={{
               addedBy: 'admin',
               dateJoin: dayjs(),
-              customJoinFeesAmount: 1100  // Add this line
+              customJoinFeesAmount: 1100,
+              jati: 'प्रजापत'
             }}
             scrollToFirstError
             disabled={loading}
@@ -845,10 +1047,11 @@ joinFeesRemainingAmount: values?.joinFeesPaymentType === 'custom' && values?.cus
                               setStoredBirthDate(null);
                               setStoredJoinDate(dayjs());
                               form.resetFields(['displayName', 'fatherName', 'guardian', 'gender', 'guardianRelation', 
-                                'jati', 'gotra', 'phone', 'phoneAlt', 'aadhaarNo', 'bobDate', 'currentAddress', 
+                                'jati', 'gotra', 'phone', 'phoneAlt', 'aadhaarNo', 'guardianAadharNo', 'bobDate', 'currentAddress', 
                                 'village', 'state', 'district', 'pinCode']);
                               form.setFieldsValue({
-                                dateJoin: dayjs()
+                                dateJoin: dayjs(),
+                                jati: 'प्रजापत'
                               });
                             }}
                           >
@@ -864,6 +1067,45 @@ joinFeesRemainingAmount: values?.joinFeesPaymentType === 'custom' && values?.cus
                 <Divider orientation="left">व्यक्तिगत जानकारी</Divider>
 
                 <Row gutter={16}>
+                  <Col span={8}>
+                    <Form.Item
+                      name="applicationNumber"
+                      label="एप्लीकेशन नंबर"
+                      rules={[
+                        { required: true, message: 'एप्लीकेशन नंबर आवश्यक है' },
+                        { 
+                          pattern: /^[0-9]+$/, 
+                          message: 'कृपया केवल संख्याएं दर्ज करें' 
+                        },
+                        {
+                          validator: async (_, value) => {
+                            if (!value) return Promise.resolve();
+                            const programId = form.getFieldValue('program');
+                            if (!programId) return Promise.resolve();
+                            
+                            const isDuplicate = await checkApplicationNumberDuplicate(value, programId);
+                            if (isDuplicate) {
+                              return Promise.reject(new Error(`एप्लीकेशन नंबर ${value} पहले से मौजूद है`));
+                            }
+                            return Promise.resolve();
+                          }
+                        }
+                      ]}
+                      tooltip="एप्लीकेशन नंबर ऑटो-जनरेट होता है, लेकिन आप मैन्युअल भी दर्ज कर सकते हैं"
+                    >
+                      <Input
+                        prefix={<IdcardOutlined />}
+                        placeholder="एप्लीकेशन नंबर"
+                        onChange={(e) => {
+                          setApplicationNumber(e.target.value);
+                          setApplicationNumberError(null);
+                        }}
+                        onBlur={handleApplicationNumberBlur}
+                        suffix={isApplicationNumberChecking ? <LoadingOutlined /> : null}
+                        status={applicationNumberError ? "error" : ""}
+                      />
+                    </Form.Item>
+                  </Col>
                   <Col span={8}>
                     <Form.Item
                       name="displayName"
@@ -886,18 +1128,19 @@ joinFeesRemainingAmount: values?.joinFeesPaymentType === 'custom' && values?.cus
                       <Input prefix={<UserOutlined />} placeholder="पिता/पति का नाम" />
                     </Form.Item>
                   </Col>
+                </Row>
+  
+                <Row gutter={16}>
                   <Col span={8}>
                     <Form.Item
                       name="jati"
                       label="जाति (Jati)"
                       rules={[{ required: true, message: 'आवश्यक' }]}
+                      initialValue="प्रजापत"
                     >
-                      <Input placeholder="जाति" />
+                      <Input placeholder="जाति" defaultValue="प्रजापत" />
                     </Form.Item>
                   </Col>
-                </Row>
-  
-                <Row gutter={16}>
                   <Col span={8}>
                     <Form.Item
                       name="gotra"
@@ -915,28 +1158,55 @@ joinFeesRemainingAmount: values?.joinFeesPaymentType === 'custom' && values?.cus
                       <Input prefix={<UserOutlined />} placeholder="वारिसदार का नाम" />
                     </Form.Item>
                   </Col>
-                  <Col span={8}>
-                    <div className='grid grid-cols-2 gap-1'>
-                      <Form.Item
-                        name="guardianRelation"
-                        label="वारि से संबंध"
-                        rules={[{ required: true, message: 'आवश्यक' }]}
-                      >
-                        <Input placeholder="उदाहरण: पिता, माता" />
-                      </Form.Item>
+                </Row>
 
-                      <Form.Item
-                        name="gender"
-                        label="Gender(लिंग)"
-                        rules={[{ required: true, message: 'आवश्यक' }]}
+                <Row gutter={16}>
+                  <Col span={8}>
+                    <Form.Item
+                      name="guardianRelation"
+                      label="वारिसदार से संबंध"
+                      rules={[{ required: true, message: 'कृपया संबंध चुनें' }]}
+                    >
+                      <Select 
+                        placeholder="वारिसदार से संबंध चुनें"
+                        showSearch
+                        optionFilterProp="children"
                       >
-                        <Select placeholder="लिंग चुनें" showSearch>
-                          {gender.map(state => (
-                            <Option key={state.value} value={state.value}>{state.label}</Option>
-                          ))}
-                        </Select>
-                      </Form.Item>
-                    </div>
+                        {guardianRelations.map(relation => (
+                          <Option key={relation.value} value={relation.value}>
+                            {relation.label}
+                          </Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item
+                      name="gender"
+                      label="Gender(लिंग)"
+                      rules={[{ required: true, message: 'आवश्यक' }]}
+                    >
+                      <Select placeholder="लिंग चुनें" showSearch>
+                        {gender.map(state => (
+                          <Option key={state.value} value={state.value}>{state.label}</Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item
+                      name="guardianAadharNo"
+                      label="वारिसदार का आधार (वैकल्पिक)"
+                      rules={[
+                        { len: 12, message: '12 अंक होने चाहिए' },
+                        { pattern: /^[0-9]{12}$/, message: 'अमान्य आधार' }
+                      ]}
+                    >
+                      <Input
+                        prefix={<IdcardOutlined />}
+                        placeholder="12 अंकों का आधार (वैकल्पिक)"
+                      />
+                    </Form.Item>
                   </Col>
                 </Row>
 
@@ -1374,182 +1644,183 @@ joinFeesRemainingAmount: values?.joinFeesPaymentType === 'custom' && values?.cus
                   )}
                 </Row>
 
-   {/* Join Fees Section */}
-<Divider orientation="left">नामांकन शुल्क</Divider>
-<Card size="small">
-  <Row gutter={16}>
-    <Col span={24}>
-      <Form.Item name="joinFeesDone" valuePropName="checked">
-        <Checkbox onChange={(e) => {
-          setIsJoinFeesDone(e.target.checked);
-          if (!e.target.checked) {
-            // Reset payment type and custom amount when unchecked
-            form.setFieldsValue({
-              joinFeesPaymentType: undefined,
-              customJoinFeesAmount: undefined
-            });
-            setJoinFeesPaymentType(null);
-            setCustomJoinFeesAmount(0);
-          }
-        }}>
-          Join Fees जमा हुआ?
-        </Checkbox>
-      </Form.Item>
-    </Col>
-  </Row>
+                {/* Join Fees Section */}
+                <Divider orientation="left">नामांकन शुल्क</Divider>
+                <Card size="small">
+                  <Row gutter={16}>
+                    <Col span={24}>
+                      <Form.Item name="joinFeesDone" valuePropName="checked">
+                        <Checkbox onChange={(e) => {
+                          setIsJoinFeesDone(e.target.checked);
+                          if (!e.target.checked) {
+                            // Reset payment type and custom amount when unchecked
+                            form.setFieldsValue({
+                              joinFeesPaymentType: undefined,
+                              customJoinFeesAmount: undefined
+                            });
+                            setJoinFeesPaymentType(null);
+                            setCustomJoinFeesAmount(0);
+                          }
+                        }}>
+                          Join Fees जमा हुआ?
+                        </Checkbox>
+                      </Form.Item>
+                    </Col>
+                  </Row>
 
-  {isJoinFeesDone && (
-    <>
-      <Row gutter={16}>
-        <Col span={12}>
-          <Form.Item
-            name="joinFeesPaymentType"
-            label="भुगतान प्रकार"
-            rules={[{ required: true, message: 'कृपया भुगतान प्रकार चुनें' }]}
-          >
-            <Select 
-              placeholder="भुगतान प्रकार चुनें"
-           onChange={(value) => {
-  setJoinFeesPaymentType(value);
-  if (value === 'full') {
-    // Set full amount when Full Paid is selected
-    setCustomJoinFeesAmount(joinFees);
-    form.setFieldsValue({
-      customJoinFeesAmount: joinFees
-    });
-  } else if (value === 'custom') {
-    // Set default amount 1100 when Custom is selected
-    setCustomJoinFeesAmount(1100);
-    form.setFieldsValue({
-      customJoinFeesAmount: 1100
-    });
-  }
-}}  
-            >
-              <Option value="full">Full Paid (₹{joinFees})</Option>
-              <Option value="custom">Custom Paid</Option>
-            </Select>
-          </Form.Item>
-        </Col>
+                  {isJoinFeesDone && (
+                    <>
+                      <Row gutter={16}>
+                        <Col span={12}>
+                          <Form.Item
+                            name="joinFeesPaymentType"
+                            label="भुगतान प्रकार"
+                            rules={[{ required: true, message: 'कृपया भुगतान प्रकार चुनें' }]}
+                          >
+                            <Select 
+                              placeholder="भुगतान प्रकार चुनें"
+                              onChange={(value) => {
+                                setJoinFeesPaymentType(value);
+                                if (value === 'full') {
+                                  // Set full amount when Full Paid is selected
+                                  setCustomJoinFeesAmount(joinFees);
+                                  form.setFieldsValue({
+                                    customJoinFeesAmount: joinFees
+                                  });
+                                } else if (value === 'custom') {
+                                  // Set default amount 1100 when Custom is selected
+                                  setCustomJoinFeesAmount(1100);
+                                  form.setFieldsValue({
+                                    customJoinFeesAmount: 1100
+                                  });
+                                }
+                              }}  
+                            >
+                              <Option value="full">Full Paid (₹{joinFees})</Option>
+                              <Option value="custom">Custom Paid</Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
 
-        <Col span={12}>
-          {joinFeesPaymentType === 'custom' && (
-            <Form.Item
-              name="customJoinFeesAmount"
-              label="भुगतान राशि"
-              rules={[
-                { required: true, message: 'कृपया भुगतान राशि दर्ज करें' },
-                {
-                  validator: (_, value) => {
-                    if (value && (value <= 0 || value > joinFees)) {
-                      return Promise.reject(new Error(`राशि ₹1 और ₹${joinFees} के बीच होनी चाहिए`));
-                    }
-                    return Promise.resolve();
-                  }
-                }
-              ]}
-            >
-              <Input
-                size='large'
-                type='number'
-                prefix="₹"
-                placeholder={`₹1 - ₹${joinFees} दर्ज करें`}
-                onChange={(e) => {
-                  const amount = parseFloat(e.target.value);
-                  if (!isNaN(amount)) {
-                    setCustomJoinFeesAmount(amount);
-                  }
-                }}
-              />
-            </Form.Item>
-          )}
-        </Col>
-      </Row>
+                        <Col span={12}>
+                          {joinFeesPaymentType === 'custom' && (
+                            <Form.Item
+                              name="customJoinFeesAmount"
+                              label="भुगतान राशि"
+                              rules={[
+                                { required: true, message: 'कृपया भुगतान राशि दर्ज करें' },
+                                {
+                                  validator: (_, value) => {
+                                    if (value && (value <= 0 || value > joinFees)) {
+                                      return Promise.reject(new Error(`राशि ₹1 और ₹${joinFees} के बीच होनी चाहिए`));
+                                    }
+                                    return Promise.resolve();
+                                  }
+                                }
+                              ]}
+                            >
+                              <Input
+                                size='large'
+                                type='number'
+                                prefix="₹"
+                                placeholder={`₹1 - ₹${joinFees} दर्ज करें`}
+                                onChange={(e) => {
+                                  const amount = parseFloat(e.target.value);
+                                  if (!isNaN(amount)) {
+                                    setCustomJoinFeesAmount(amount);
+                                  }
+                                }}
+                              />
+                            </Form.Item>
+                          )}
+                        </Col>
+                      </Row>
 
-      <Row gutter={16}>
-        <Col span={24}>
-          <Form.Item
-            name="joinFeesTxtId"
-            label="Join Fees Transaction ID"
-            rules={[
-              { required: true, message: 'कृपया Transaction ID दर्ज करें' },
-            ]}
-          >
-            <Input
-              size='large'
-              placeholder='Enter Join Fees Transaction ID'
-              autoComplete='off'
-              prefix={<IdcardOutlined />}
-            />
-          </Form.Item>
-        </Col>
-      </Row>
+                      <Row gutter={16}>
+                        <Col span={24}>
+                          <Form.Item
+                            name="joinFeesTxtId"
+                            label="Join Fees Transaction ID"
+                            rules={[
+                              { required: true, message: 'कृपया Transaction ID दर्ज करें' },
+                            ]}
+                          >
+                            <Input
+                              size='large'
+                              placeholder='Enter Join Fees Transaction ID'
+                              autoComplete='off'
+                              prefix={<IdcardOutlined />}
+                            />
+                          </Form.Item>
+                        </Col>
+                      </Row>
 
-      {/* Display payment summary */}
-      {(joinFeesPaymentType === 'full' || 
-        (joinFeesPaymentType === 'custom' && customJoinFeesAmount > 0)) && (
-        <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded">
-          <Text strong>भुगतान सारांश:</Text>
-          <div className="mt-1">
-            <Text>कुल नामांकन शुल्क: ₹{joinFees}</Text>
-            <br />
-            <Text type="success">
-              भुगतान राशि: ₹
-              {joinFeesPaymentType === 'full' 
-                ? joinFees 
-                : customJoinFeesAmount || 0}
-            </Text>
-            {joinFeesPaymentType === 'custom' && 
-             customJoinFeesAmount > 0 && 
-             customJoinFeesAmount < joinFees && (
-              <>
-                <br />
-                <Text type="danger">
-                  बकाया राशि: ₹{joinFees - customJoinFeesAmount}
-                </Text>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-    </>
-  )}
-</Card>
-{/* Membership Closing Days */}
-<Divider orientation="left">सदस्यता समाप्ति</Divider>
-<Card size="small">
-  <Row gutter={16}>
-    <Col span={24}>
-      <Form.Item
-        name="closingMonths"
-        label="सदस्यता समाप्ति महीने (Membership Closing Months)"
-        tooltip="कितने महीनों बाद यह सदस्य बंद/निष्क्रिय हो जाएगा?"
-        rules={[
-          { 
-            validator: (_, value) => {
-              if (value && (value < 0 || value > 120)) {
-                return Promise.reject(new Error('कृपया 0 से 120 महीनों के बीच मान दर्ज करें'));
-              }
-              return Promise.resolve();
-            }
-          }
-        ]}
-      >
-        <Input
-          type="number"
-          size="large"
-          placeholder="महीनों की संख्या दर्ज करें (उदा: 6, 12, 24)"
-          prefix={<CalendarOutlined />}
-          suffix="महीने"
-          onChange={(e) => {
-            const months = parseInt(e.target.value);
-            setClosingDays(months);
-          }}
-        />
-      </Form.Item>
-    </Col>
-  </Row>
-</Card>
+                      {/* Display payment summary */}
+                      {(joinFeesPaymentType === 'full' || 
+                        (joinFeesPaymentType === 'custom' && customJoinFeesAmount > 0)) && (
+                        <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded">
+                          <Text strong>भुगतान सारांश:</Text>
+                          <div className="mt-1">
+                            <Text>कुल नामांकन शुल्क: ₹{joinFees}</Text>
+                            <br />
+                            <Text type="success">
+                              भुगतान राशि: ₹
+                              {joinFeesPaymentType === 'full' 
+                                ? joinFees 
+                                : customJoinFeesAmount || 0}
+                            </Text>
+                            {joinFeesPaymentType === 'custom' && 
+                             customJoinFeesAmount > 0 && 
+                             customJoinFeesAmount < joinFees && (
+                              <>
+                                <br />
+                                <Text type="danger">
+                                  बकाया राशि: ₹{joinFees - customJoinFeesAmount}
+                                </Text>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </Card>
+
+                {/* Membership Closing Days */}
+                <Divider orientation="left">सदस्यता समाप्ति</Divider>
+                <Card size="small">
+                  <Row gutter={16}>
+                    <Col span={24}>
+                      <Form.Item
+                        name="closingMonths"
+                        label="सदस्यता समाप्ति महीने (Membership Closing Months)"
+                        tooltip="कितने महीनों बाद यह सदस्य बंद/निष्क्रिय हो जाएगा?"
+                        rules={[
+                          { 
+                            validator: (_, value) => {
+                              if (value && (value < 0 || value > 120)) {
+                                return Promise.reject(new Error('कृपया 0 से 120 महीनों के बीच मान दर्ज करें'));
+                              }
+                              return Promise.resolve();
+                            }
+                          }
+                        ]}
+                      >
+                        <Input
+                          type="number"
+                          size="large"
+                          placeholder="महीनों की संख्या दर्ज करें (उदा: 6, 12, 24)"
+                          prefix={<CalendarOutlined />}
+                          suffix="महीने"
+                          onChange={(e) => {
+                            const months = parseInt(e.target.value);
+                            setClosingDays(months);
+                          }}
+                        />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                </Card>
 
                 {/* Hidden field for age group ID */}
                 <Form.Item name="ageGroup" hidden>

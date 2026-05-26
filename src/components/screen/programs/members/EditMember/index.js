@@ -30,6 +30,23 @@ const { Option } = Select;
 const { TextArea } = Input;
 const { Title, Text } = Typography;
 
+// Guardian relations dropdown options
+const guardianRelations = [
+  { value: "पिता-पुत्र", label: "पिता-पुत्र" },
+  { value: "पिता-पुत्री", label: "पिता-पुत्री" },
+  { value: "माता-पुत्र", label: "माता-पुत्र" },
+  { value: "माता-पुत्री", label: "माता-पुत्री" },
+  { value: "भाई-भाई", label: "भाई-भाई" },
+  { value: "भाई-बहिन", label: "भाई-बहिन" },
+  { value: "बहिन-बहिन", label: "बहिन-बहिन" },
+  { value: "मामा-भाणेज", label: "मामा-भाणेज" },
+  { value: "मामा-भाणेजी", label: "मामा-भाणेजी" },
+  { value: "नाना-दोहिता", label: "नाना-दोहिता" },
+  { value: "नाना-दोहिती", label: "नाना-दोहिती" },
+  { value: "मामी-ननदोइता", label: "मामी-ननदोइता" },
+  { value: "मामी-ननदोइती", label: "मामी-ननदोइती" }
+];
+
 const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
   const programList = useSelector((state) => state.data.programList || []);
   const agentsList = useSelector((state) => state.data.agentsList || []);
@@ -64,6 +81,7 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
   const [extraFields, setExtraFields] = useState([]);
 
   const [districts, setDistricts] = useState([]);
+  const [closingDays, setClosingDays] = useState(null);
 
   const getDecimalAge = (birthDate, joinDate) => {
     return dayjs(joinDate).diff(dayjs(birthDate), 'year', true);
@@ -80,177 +98,180 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
   };
 
   // Initialize form with existing member data
-useEffect(() => {
-  if (open && memberData) {
-    // Find the program
-    const program = programList.find(p => p.id === memberData.programId);
-    setSelectedProgram(program);
+  useEffect(() => {
+    if (open && memberData) {
+      // Find the program
+      const program = programList.find(p => p.id === memberData.programId);
+      setSelectedProgram(program);
 
-    // Set districts based on state
-    if (memberData.state) {
-      setDistricts(districtsByState[memberData.state] || []);
-    }
-
-    // Get join date
-    const dateJoin = memberData.dateJoin 
-      ? dayjs(memberData.dateJoin, 'DD-MM-YYYY') 
-      : (memberData.requestCreatedAt?.seconds 
-        ? dayjs(memberData.requestCreatedAt.seconds * 1000) 
-        : dayjs());
-
-    // Calculate age and set age group
-    if (program && memberData.bobDate) {
-      const birthDate = dayjs(memberData.bobDate, 'DD-MM-YYYY');
-      const decimalAge = getDecimalAge(birthDate, dateJoin);
-      const age = Math.floor(decimalAge);
-
-      const matchingGroup = program.ageGroups?.find(group =>
-        decimalAge >= group.startAge &&
-        decimalAge < group.endAge
-      );
-
-      if (matchingGroup) {
-        setSelectedAgeGroup(matchingGroup);
-        setPayAmount(matchingGroup.payAmount || 0);
-        setJoinFees(matchingGroup.joinFee || 0);
-      } else {  
-        setSelectedAgeGroup(null);
-        setPayAmount(0);
-        setJoinFees(0);
+      // Set districts based on state
+      if (memberData.state) {
+        setDistricts(districtsByState[memberData.state] || []);
       }
-    }
 
-    // Find location group
-    if (program && memberData.locationGroup) {
-      const locGroup = program.locationGroups?.find(g => 
-        g.location === memberData.locationGroup || g.groupName === memberData.memberGroup
-      );
-      setSelectedLocationGroup(locGroup);
-    }
+      // Get join date
+      const dateJoin = memberData.dateJoin 
+        ? dayjs(memberData.dateJoin, 'DD-MM-YYYY') 
+        : (memberData.requestCreatedAt?.seconds 
+          ? dayjs(memberData.requestCreatedAt.seconds * 1000) 
+          : dayjs());
 
-    // Set extra fields
-    if (memberData.extraDetails && Array.isArray(memberData.extraDetails)) {
-      setExtraFields(memberData.extraDetails);
-    }
+      // Calculate age and set age group
+      if (program && memberData.bobDate) {
+        const birthDate = dayjs(memberData.bobDate, 'DD-MM-YYYY');
+        const decimalAge = getDecimalAge(birthDate, dateJoin);
+        const age = Math.floor(decimalAge);
 
-    // Set Join Fees payment data
-    const joinFeesDoneStatus = memberData?.joinFeesDone || false;
-    setIsJoinFeesDone(joinFeesDoneStatus);
-    
-    if (joinFeesDoneStatus) {
-      const paymentTypeValue = memberData?.joinFeesPaymentType || 'full';
-      setJoinFeesPaymentType(paymentTypeValue);
+        const matchingGroup = program.ageGroups?.find(group =>
+          decimalAge >= group.startAge &&
+          decimalAge < group.endAge
+        );
+
+        if (matchingGroup) {
+          setSelectedAgeGroup(matchingGroup);
+          setPayAmount(matchingGroup.payAmount || 0);
+          setJoinFees(matchingGroup.joinFee || 0);
+        } else {  
+          setSelectedAgeGroup(null);
+          setPayAmount(0);
+          setJoinFees(0);
+        }
+      }
+
+      // Find location group
+      if (program && memberData.locationGroup) {
+        const locGroup = program.locationGroups?.find(g => 
+          g.location === memberData.locationGroup || g.groupName === memberData.memberGroup
+        );
+        setSelectedLocationGroup(locGroup);
+      }
+
+      // Set extra fields
+      if (memberData.extraDetails && Array.isArray(memberData.extraDetails)) {
+        setExtraFields(memberData.extraDetails);
+      }
+
+      // Set Join Fees payment data
+      const joinFeesDoneStatus = memberData?.joinFeesDone || false;
+      setIsJoinFeesDone(joinFeesDoneStatus);
       
-      if (paymentTypeValue === 'custom') {
-        const paidAmount = memberData?.joinFeesPaidAmount || 0;
-        setCustomJoinFeesAmount(paidAmount);
-      } else if (paymentTypeValue === 'full') {
-        const fullAmount = memberData?.joinFees || 0;
-        setCustomJoinFeesAmount(fullAmount);
+      if (joinFeesDoneStatus) {
+        const paymentTypeValue = memberData?.joinFeesPaymentType || 'full';
+        setJoinFeesPaymentType(paymentTypeValue);
+        
+        if (paymentTypeValue === 'custom') {
+          const paidAmount = memberData?.joinFeesPaidAmount || 0;
+          setCustomJoinFeesAmount(paidAmount);
+        } else if (paymentTypeValue === 'full') {
+          const fullAmount = memberData?.joinFees || 0;
+          setCustomJoinFeesAmount(fullAmount);
+        }
+      } else {
+        setJoinFeesPaymentType(null);
+        setCustomJoinFeesAmount(0);
       }
-    } else {
-      setJoinFeesPaymentType(null);
-      setCustomJoinFeesAmount(0);
+
+      // Set existing images as file list items
+      if (memberData.photoURL) {
+        setPhoto([{
+          uid: '-1',
+          name: 'photo.jpg',
+          status: 'done',
+          url: memberData.photoURL,
+        }]);
+      } else {
+        setPhoto([]);
+      }
+
+      if (memberData.extraImageURL) {
+        setExtraPhoto([{
+          uid: '-2',
+          name: 'extra.jpg',
+          status: 'done',
+          url: memberData.extraImageURL,
+        }]);
+      } else {
+        setExtraPhoto([]);
+      }
+
+      if (memberData.documentFrontURL) {
+        setDocumentFront([{
+          uid: '-3',
+          name: 'front.jpg',
+          status: 'done',
+          url: memberData.documentFrontURL,
+        }]);
+      } else {
+        setDocumentFront([]);
+      }
+
+      if (memberData.documentBackURL) {
+        setDocumentBack([{
+          uid: '-4',
+          name: 'back.jpg',
+          status: 'done',
+          url: memberData.documentBackURL,
+        }]);
+      } else {
+        setDocumentBack([]);
+      }
+
+      if (memberData.guardianDocumentURL) {
+        setGuardianDocument([{
+          uid: '-5',
+          name: 'guardian.jpg',
+          status: 'done',
+          url: memberData.guardianDocumentURL,
+        }]);
+      } else {
+        setGuardianDocument([]);
+      }
+      
+      setAddedBy(memberData.addedBy || 'admin');
+
+      // Set form values
+      const formValues = {
+        displayName: memberData.displayName,
+        fatherName: memberData.fatherName,
+        guardian: memberData.guardian,
+        guardianRelation: memberData.guardianRelation,
+        gender: memberData.gender,
+        jati: memberData.jati || 'Parjapati',
+        gotra: memberData.gotra || '',
+        phone: memberData.phone,
+        phoneAlt: memberData.phoneAlt || '',
+        aadhaarNo: memberData.aadhaarNo,
+        guardianAadharNo: memberData.guardianAadharNo || '',
+        applicationNumber: memberData.applicationNumber,
+        bobDate: memberData.bobDate ? dayjs(memberData.bobDate, 'DD-MM-YYYY') : null,
+        dateJoin: dateJoin,
+        currentAddress: memberData.currentAddress,
+        village: memberData.village,
+        state: memberData.state,
+        district: memberData.district,
+        pinCode: memberData.pinCode,
+        program: memberData.programId,
+        ageGroup: memberData.ageGroup,
+        closingMonths: memberData.closingMonths || 0,
+        locationGroup: selectedLocationGroup?.id || undefined,
+        addedBy: memberData.addedBy || 'admin',
+        selectedAgent: memberData.agentId || undefined,
+        joinFeesDone: joinFeesDoneStatus,
+        joinFeesPaymentType: joinFeesPaymentType,
+        joinFeesTxtId: memberData?.joinFeesTxtId || ""
+      };
+
+      // Add custom join fees amount if applicable
+      if (joinFeesDoneStatus && joinFeesPaymentType === 'custom') {
+        formValues.customJoinFeesAmount = memberData?.joinFeesPaidAmount || 0;
+      } else if (joinFeesDoneStatus && joinFeesPaymentType === 'full') {
+        formValues.customJoinFeesAmount = memberData?.joinFees || 0;
+      }
+
+      form.setFieldsValue(formValues);
     }
+  }, [open, memberData, programList, form, selectedLocationGroup]);
 
-    // Set existing images as file list items
-    if (memberData.photoURL) {
-      setPhoto([{
-        uid: '-1',
-        name: 'photo.jpg',
-        status: 'done',
-        url: memberData.photoURL,
-      }]);
-    } else {
-      setPhoto([]);
-    }
-
-    if (memberData.extraImageURL) {
-      setExtraPhoto([{
-        uid: '-2',
-        name: 'extra.jpg',
-        status: 'done',
-        url: memberData.extraImageURL,
-      }]);
-    } else {
-      setExtraPhoto([]);
-    }
-
-    if (memberData.documentFrontURL) {
-      setDocumentFront([{
-        uid: '-3',
-        name: 'front.jpg',
-        status: 'done',
-        url: memberData.documentFrontURL,
-      }]);
-    } else {
-      setDocumentFront([]);
-    }
-
-    if (memberData.documentBackURL) {
-      setDocumentBack([{
-        uid: '-4',
-        name: 'back.jpg',
-        status: 'done',
-        url: memberData.documentBackURL,
-      }]);
-    } else {
-      setDocumentBack([]);
-    }
-
-    if (memberData.guardianDocumentURL) {
-      setGuardianDocument([{
-        uid: '-5',
-        name: 'guardian.jpg',
-        status: 'done',
-        url: memberData.guardianDocumentURL,
-      }]);
-    } else {
-      setGuardianDocument([]);
-    }
-    
-    setAddedBy(memberData.addedBy || 'admin');
-
-    // Set form values
-    const formValues = {
-      displayName: memberData.displayName,
-      fatherName: memberData.fatherName,
-      guardian: memberData.guardian,
-      guardianRelation: memberData.guardianRelation,
-      gender: memberData.gender,
-      jati: memberData.jati,
-      gotra: memberData.gotra || '',
-      phone: memberData.phone,
-      phoneAlt: memberData.phoneAlt || '',
-      aadhaarNo: memberData.aadhaarNo,
-      bobDate: memberData.bobDate ? dayjs(memberData.bobDate, 'DD-MM-YYYY') : null,
-      dateJoin: dateJoin,
-      currentAddress: memberData.currentAddress,
-      village: memberData.village,
-      state: memberData.state,
-      district: memberData.district,
-      pinCode: memberData.pinCode,
-      program: memberData.programId,
-      ageGroup: memberData.ageGroup,
-      closingMonths: memberData.closingMonths || 0,
-      locationGroup: selectedLocationGroup?.id || undefined,
-      addedBy: memberData.addedBy || 'admin',
-      selectedAgent: memberData.agentId || undefined,
-      joinFeesDone: joinFeesDoneStatus,
-      joinFeesPaymentType: joinFeesPaymentType,
-      joinFeesTxtId: memberData?.joinFeesTxtId || ""
-    };
-
-    // Add custom join fees amount if applicable
-    if (joinFeesDoneStatus && joinFeesPaymentType === 'custom') {
-      formValues.customJoinFeesAmount = memberData?.joinFeesPaidAmount || 0;
-    } else if (joinFeesDoneStatus && joinFeesPaymentType === 'full') {
-      formValues.customJoinFeesAmount = memberData?.joinFees || 0;
-    }
-
-    form.setFieldsValue(formValues);
-  }
-}, [open, memberData, programList, form, selectedLocationGroup]);
   // Reset form when drawer closes
   useEffect(() => {
     if (!open) {
@@ -280,44 +301,84 @@ useEffect(() => {
   };
 
   // Calculate age and set age group
-const handleDateOfBirthChange = (date) => {
-  if (!date || !selectedProgram) return;
+  const handleDateOfBirthChange = (date) => {
+    if (!date || !selectedProgram) return;
 
-  const joinDate = form.getFieldValue('dateJoin') || dayjs();  // Make sure this is getting the current join date
-  const decimalAge = getDecimalAge(date, joinDate);
-  const age = Math.floor(decimalAge);
+    const joinDate = form.getFieldValue('dateJoin') || dayjs();
+    const decimalAge = getDecimalAge(date, joinDate);
+    const age = Math.floor(decimalAge);
 
-  const matchingGroup = selectedProgram.ageGroups?.find(group =>
-    decimalAge >= group.startAge &&
-    decimalAge < group.endAge
-  );
+    const matchingGroup = selectedProgram.ageGroups?.find(group =>
+      decimalAge >= group.startAge &&
+      decimalAge < group.endAge
+    );
 
-  if (matchingGroup) {
-    setSelectedAgeGroup(matchingGroup);
-    setPayAmount(matchingGroup.payAmount || 0);
-    setJoinFees(matchingGroup.joinFee || 0);
-    form.setFieldsValue({ ageGroup: matchingGroup.id });
-    
-    // Reset join fees payment if join fees amount changed
-    if (isJoinFeesDone) {
+    if (matchingGroup) {
+      setSelectedAgeGroup(matchingGroup);
+      setPayAmount(matchingGroup.payAmount || 0);
+      setJoinFees(matchingGroup.joinFee || 0);
+      form.setFieldsValue({ ageGroup: matchingGroup.id });
+      
+      // Reset join fees payment if join fees amount changed
+      if (isJoinFeesDone) {
+        form.setFieldsValue({
+          joinFeesPaymentType: undefined,
+          customJoinFeesAmount: undefined
+        });
+        setJoinFeesPaymentType(null);
+        setCustomJoinFeesAmount(0);
+      }
+    } else {
+      message.warning(`उम्र ${age} इस कार्यक्रम के लिए किसी भी पात्र आयु समूह में नहीं आती है।`);
       form.setFieldsValue({
-        joinFeesPaymentType: undefined,
-        customJoinFeesAmount: undefined
+        bobDate: null,
+        ageGroup: undefined
       });
-      setJoinFeesPaymentType(null);
-      setCustomJoinFeesAmount(0);
+      setSelectedAgeGroup(null);
+      setPayAmount(0);
+      setJoinFees(0);
     }
-  } else {
-    message.warning(`उम्र ${age} इस कार्यक्रम के लिए किसी भी पात्र आयु समूह में नहीं आती है।`);
-    form.setFieldsValue({
-      bobDate: null,
-      ageGroup: undefined
-    });
-    setSelectedAgeGroup(null);
-    setPayAmount(0);
-    setJoinFees(0);
-  }
-};
+  };
+
+  // Handle join date change
+  const handleJoinDateChange = (date) => {
+    if (!date || !selectedProgram) return;
+
+    const birthDate = form.getFieldValue('bobDate');
+    
+    if (birthDate) {
+      const decimalAge = getDecimalAge(birthDate, date);
+      const age = Math.floor(decimalAge);
+
+      const matchingGroup = selectedProgram.ageGroups?.find(group =>
+        decimalAge >= group.startAge &&
+        decimalAge < group.endAge
+      );
+
+      if (matchingGroup) {
+        setSelectedAgeGroup(matchingGroup);
+        setPayAmount(matchingGroup.payAmount || 0);
+        setJoinFees(matchingGroup.joinFee || 0);
+        form.setFieldsValue({ ageGroup: matchingGroup.id });
+        
+        // Reset join fees payment if join fees amount changed
+        if (isJoinFeesDone) {
+          form.setFieldsValue({
+            joinFeesPaymentType: undefined,
+            customJoinFeesAmount: undefined
+          });
+          setJoinFeesPaymentType(null);
+          setCustomJoinFeesAmount(0);
+        }
+      } else {
+        message.warning(`उम्र ${age} इस कार्यक्रम के लिए किसी भी पात्र आयु समूह में नहीं आती है।`);
+        setSelectedAgeGroup(null);
+        setPayAmount(0);
+        setJoinFees(0);
+        form.setFieldsValue({ ageGroup: undefined });
+      }
+    }
+  };
 
   // Handle upload changes with cropping support
   const handleUploadChange = (setter) => ({ fileList }) => {
@@ -382,7 +443,8 @@ const handleDateOfBirthChange = (date) => {
   // Form submission
   const onFinish = async (values) => {
     setLoading(true);
-console.log(values,'values')
+    console.log(values, 'values');
+
     try {
       const updatedData = { ...memberData };
 
@@ -463,11 +525,13 @@ console.log(values,'values')
         guardian: values.guardian,
         guardianRelation: values.guardianRelation,
         gender: values.gender,
-        jati: values.jati,
+        jati: values.jati || 'Parjapati',
         gotra: values.gotra || '',
         phone: values.phone,
         phoneAlt: values.phoneAlt || '',
         aadhaarNo: values.aadhaarNo,
+        guardianAadharNo: values.guardianAadharNo || '',
+        applicationNumber: values.applicationNumber,
         bobDate: values.bobDate.format('DD-MM-YYYY'),
         currentAddress: values.currentAddress,
         village: values.village,
@@ -476,9 +540,10 @@ console.log(values,'values')
         pinCode: values.pinCode,
         closingMonths: values.closingMonths || 0,
         ageGroup: selectedAgeGroup?.id,
-        ageGroupRange: `${selectedAgeGroup?.startAge}-${selectedAgeGroup?.endAge}`,
+        ageGroupRange: selectedAgeGroup ? `${selectedAgeGroup?.startAge}-${selectedAgeGroup?.endAge}` : '',
         memberGroup: selectedLocationGroup?.groupName || 'Group_A',
         locationGroup: selectedLocationGroup?.location || '',
+        locactionGroupId: selectedLocationGroup?.id || '',
         payAmount: payAmount,
         joinFees: joinFees,
         joinFeesDone: values.joinFeesDone || false,
@@ -511,44 +576,6 @@ console.log(values,'values')
       setLoading(false);
     }
   };
-  const handleJoinDateChange = (date) => {
-  if (!date || !selectedProgram) return;
-
-  const birthDate = form.getFieldValue('bobDate');
-  
-  if (birthDate) {
-    const decimalAge = getDecimalAge(birthDate, date);
-    const age = Math.floor(decimalAge);
-
-    const matchingGroup = selectedProgram.ageGroups?.find(group =>
-      decimalAge >= group.startAge &&
-      decimalAge < group.endAge
-    );
-
-    if (matchingGroup) {
-      setSelectedAgeGroup(matchingGroup);
-      setPayAmount(matchingGroup.payAmount || 0);
-      setJoinFees(matchingGroup.joinFee || 0);
-      form.setFieldsValue({ ageGroup: matchingGroup.id });
-      
-      // Reset join fees payment if join fees amount changed
-      if (isJoinFeesDone) {
-        form.setFieldsValue({
-          joinFeesPaymentType: undefined,
-          customJoinFeesAmount: undefined
-        });
-        setJoinFeesPaymentType(null);
-        setCustomJoinFeesAmount(0);
-      }
-    } else {
-      message.warning(`उम्र ${age} इस कार्यक्रम के लिए किसी भी पात्र आयु समूह में नहीं आती है।`);
-      setSelectedAgeGroup(null);
-      setPayAmount(0);
-      setJoinFees(0);
-      form.setFieldsValue({ ageGroup: undefined });
-    }
-  }
-};
 
   if (!memberData) return null;
 
@@ -616,20 +643,20 @@ console.log(values,'values')
                   </Form.Item>
                 </Col>
                 <Col span={8}>
-  <Form.Item
-    name="dateJoin"
-    label="जुड़ने की तारीख"
-    rules={[{ required: true, message: 'आवश्यक' }]}
-  >
-    <DatePicker
-      style={{ width: '100%' }}
-      format="DD-MM-YYYY"
-      prefix={<CalendarOutlined />}
-      disabledDate={(current) => current && current > dayjs()}
-      onChange={handleJoinDateChange}  // Add this line
-    />
-  </Form.Item>
-</Col>
+                  <Form.Item
+                    name="dateJoin"
+                    label="जुड़ने की तारीख"
+                    rules={[{ required: true, message: 'आवश्यक' }]}
+                  >
+                    <DatePicker
+                      style={{ width: '100%' }}
+                      format="DD-MM-YYYY"
+                      prefix={<CalendarOutlined />}
+                      disabledDate={(current) => current && current > dayjs()}
+                      onChange={handleJoinDateChange}
+                    />
+                  </Form.Item>
+                </Col>
               </Row>
             </Card>
 
@@ -637,6 +664,25 @@ console.log(values,'values')
             <Divider orientation="left">व्यक्तिगत जानकारी</Divider>
 
             <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item
+                  name="applicationNumber"
+                  label="एप्लीकेशन नंबर"
+                  rules={[
+                    { required: true, message: 'एप्लीकेशन नंबर आवश्यक है' },
+                    { 
+                      pattern: /^[0-9]+$/, 
+                      message: 'कृपया केवल संख्याएं दर्ज करें' 
+                    }
+                  ]}
+                  tooltip="एप्लीकेशन नंबर"
+                >
+                  <Input
+                    prefix={<IdcardOutlined />}
+                    placeholder="एप्लीकेशन नंबर"
+                  />
+                </Form.Item>
+              </Col>
               <Col span={8}>
                 <Form.Item
                   name="displayName"
@@ -655,6 +701,9 @@ console.log(values,'values')
                   <Input prefix={<UserOutlined />} placeholder="पिता का नाम" />
                 </Form.Item>
               </Col>
+            </Row>
+
+            <Row gutter={16}>
               <Col span={8}>
                 <Form.Item
                   name="jati"
@@ -664,9 +713,6 @@ console.log(values,'values')
                   <Input placeholder="जाति" />
                 </Form.Item>
               </Col>
-            </Row>
-
-            <Row gutter={16}>
               <Col span={8}>
                 <Form.Item name="gotra" label="गोत्र (Gotra) (वैकल्पिक)">
                   <Input placeholder="गोत्र" />
@@ -681,28 +727,55 @@ console.log(values,'values')
                   <Input prefix={<UserOutlined />} placeholder="वारिसदार का नाम" />
                 </Form.Item>
               </Col>
-              <Col span={8}>
-                <div className='grid grid-cols-2 gap-1'>
-                  <Form.Item
-                    name="guardianRelation"
-                    label="वारि से संबंध"
-                    rules={[{ required: true, message: 'आवश्यक' }]}
-                  >
-                    <Input placeholder="उदाहरण: पिता, माता" />
-                  </Form.Item>
+            </Row>
 
-                  <Form.Item
-                    name="gender"
-                    label="Gender(लिंग)"
-                    rules={[{ required: true, message: 'आवश्यक' }]}
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item
+                  name="guardianRelation"
+                  label="वारिसदार से संबंध"
+                  rules={[{ required: true, message: 'कृपया संबंध चुनें' }]}
+                >
+                  <Select 
+                    placeholder="वारिसदार से संबंध चुनें"
+                    showSearch
+                    optionFilterProp="children"
                   >
-                    <Select placeholder="लिंग चुनें" showSearch>
-                      {gender.map(state => (
-                        <Option key={state.value} value={state.value}>{state.label}</Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                </div>
+                    {guardianRelations.map(relation => (
+                      <Option key={relation.value} value={relation.value}>
+                        {relation.label}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item
+                  name="gender"
+                  label="Gender(लिंग)"
+                  rules={[{ required: true, message: 'आवश्यक' }]}
+                >
+                  <Select placeholder="लिंग चुनें" showSearch>
+                    {gender.map(state => (
+                      <Option key={state.value} value={state.value}>{state.label}</Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item
+                  name="guardianAadharNo"
+                  label="वारिसदार का आधार (वैकल्पिक)"
+                  rules={[
+                    { len: 12, message: '12 अंक होने चाहिए' },
+                    { pattern: /^[0-9]{12}$/, message: 'अमान्य आधार' }
+                  ]}
+                >
+                  <Input
+                    prefix={<IdcardOutlined />}
+                    placeholder="12 अंकों का आधार (वैकल्पिक)"
+                  />
+                </Form.Item>
               </Col>
             </Row>
 
@@ -756,20 +829,6 @@ console.log(values,'values')
             <Row gutter={16}>
               <Col span={8}>
                 <Form.Item
-                  name="dateJoin"
-                  label="जुड़ने की तारीख"
-                  rules={[{ required: true, message: 'आवश्यक' }]}
-                >
-                  <DatePicker
-                    style={{ width: '100%' }}
-                    format="DD-MM-YYYY"
-                    prefix={<CalendarOutlined />}
-                    disabledDate={(current) => current && current > dayjs()}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
                   name="bobDate"
                   label="जन्म तिथि"
                   rules={[{ required: true, message: 'आवश्यक' }]}
@@ -791,9 +850,6 @@ console.log(values,'values')
                   />
                 </Form.Item>
               </Col>
-            </Row>
-
-            <Row gutter={16}>
               <Col span={8}>
                 <Form.Item
                   name="locationGroup"
@@ -816,6 +872,9 @@ console.log(values,'values')
                   </Select>
                 </Form.Item>
               </Col>
+            </Row>
+
+            <Row gutter={16}>
               <Col span={8}>
                 <Form.Item label="वेतन राशि">
                   <Input
@@ -1266,40 +1325,42 @@ console.log(values,'values')
                 </Col>
               )}
             </Row>
-<Divider orientation="left">सदस्यता समाप्ति</Divider>
-<Card size="small">
-  <Row gutter={16}>
-    <Col span={24}>
-      <Form.Item
-        name="closingMonths"
-        label="सदस्यता समाप्ति महीने (Membership Closing Months)"
-        tooltip="कितने महीनों बाद यह सदस्य बंद/निष्क्रिय हो जाएगा?"
-        rules={[
-          { 
-            validator: (_, value) => {
-              if (value && (value < 0 || value > 120)) {
-                return Promise.reject(new Error('कृपया 0 से 120 महीनों के बीच मान दर्ज करें'));
-              }
-              return Promise.resolve();
-            }
-          }
-        ]}
-      >
-        <Input
-          type="number"
-          size="large"
-          placeholder="महीनों की संख्या दर्ज करें (उदा: 6, 12, 24)"
-          prefix={<CalendarOutlined />}
-          suffix="महीने"
-          onChange={(e) => {
-            const months = parseInt(e.target.value);
-            setClosingDays(months);
-          }}
-        />
-      </Form.Item>
-    </Col>
-  </Row>
-</Card>
+
+            <Divider orientation="left">सदस्यता समाप्ति</Divider>
+            <Card size="small">
+              <Row gutter={16}>
+                <Col span={24}>
+                  <Form.Item
+                    name="closingMonths"
+                    label="सदस्यता समाप्ति महीने (Membership Closing Months)"
+                    tooltip="कितने महीनों बाद यह सदस्य बंद/निष्क्रिय हो जाएगा?"
+                    rules={[
+                      { 
+                        validator: (_, value) => {
+                          if (value && (value < 0 || value > 120)) {
+                            return Promise.reject(new Error('कृपया 0 से 120 महीनों के बीच मान दर्ज करें'));
+                          }
+                          return Promise.resolve();
+                        }
+                      }
+                    ]}
+                  >
+                    <Input
+                      type="number"
+                      size="large"
+                      placeholder="महीनों की संख्या दर्ज करें (उदा: 6, 12, 24)"
+                      prefix={<CalendarOutlined />}
+                      suffix="महीने"
+                      onChange={(e) => {
+                        const months = parseInt(e.target.value);
+                        setClosingDays(months);
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Card>
+
             {/* Hidden field for age group ID */}
             <Form.Item name="ageGroup" hidden>
               <Input />
