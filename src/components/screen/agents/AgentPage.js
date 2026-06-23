@@ -232,47 +232,52 @@ const { message, modal } = App.useApp();
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
-      width: 80,
+      width: 110,
       render: (_, record) => (
-        <Dropdown
-          menu={{
-            items: [
-              {
-                key: 'view',
-                icon: <EyeOutlined />,
-                label: 'View',
-                onClick: () => handleView(record),
-              },
-              {
-                key: 'edit',
-                icon: <EditOutlined />,
-                label: 'Edit',
-                onClick: () => handleEdit(record),
-              },
-              {
-                key: 'password',
-                icon: <KeyOutlined />,
-                label: 'Change Password',
-                onClick: () => {
-                  setSelectedAgent(record);
-                  setNewPassword('');
-                  setPasswordModalVisible(true);
+        <Space size={2}>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => handleView(record)}
+            style={{ color: '#3b82f6', padding: '4px 8px', fontSize: 13 }}
+          >
+            View
+          </Button>
+          <Dropdown
+            menu={{
+              items: [
+                {
+                  key: 'edit',
+                  icon: <EditOutlined />,
+                  label: 'Edit',
+                  onClick: () => handleEdit(record),
                 },
-              },
-              { type: 'divider' },
-              {
-                key: 'delete',
-                icon: <DeleteOutlined />,
-                label: 'Delete',
-                danger: true,
-                onClick: () => handleDelete(record),
-              },
-            ],
-          }}
-          trigger={['click']}
-        >
-          <Button type="text" icon={<MoreOutlined />} size="small" />
-        </Dropdown>
+                {
+                  key: 'password',
+                  icon: <KeyOutlined />,
+                  label: 'Change Password',
+                  onClick: () => {
+                    setSelectedAgent(record);
+                    setNewPassword('');
+                    setPasswordModalVisible(true);
+                  },
+                },
+                { type: 'divider' },
+                {
+                  key: 'delete',
+                  icon: <DeleteOutlined />,
+                  label: 'Delete',
+                  danger: true,
+                  onClick: () => handleDelete(record),
+                },
+              ],
+            }}
+            trigger={['click']}
+          >
+            <Button type="text" icon={<MoreOutlined />} size="small" />
+          </Dropdown>
+        </Space>
       ),
     },
   ];

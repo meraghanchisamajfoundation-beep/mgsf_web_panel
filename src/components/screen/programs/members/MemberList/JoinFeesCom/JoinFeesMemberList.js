@@ -646,6 +646,7 @@ const JoinFeesMemberList = ({ onSuccess,open, onClose, membersData, agentData, s
                 member={selectedMemberForHistory}
                 programId={selectedProgram?.id}
                 agentData={agentData}
+                onDeleteSuccess={onSuccess}
             />
 
             <JoinFeesExportPDF

@@ -1,14 +1,15 @@
 import {
-    Drawer, Card, Row, Col, Tag, Progress, Empty, Timeline, Typography
+    Drawer, Card, Row, Col, Tag, Progress, Empty, Timeline, Typography,
+    App
 } from 'antd'
 import {
     CloseOutlined, HistoryOutlined, 
-    CheckCircleOutlined
+    CheckCircleOutlined, DeleteOutlined
 } from '@ant-design/icons'
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/AuthProvider'
 import dayjs from 'dayjs'
-import { getData } from '@/lib/services/firebaseService'
+import { getData, deleteData, updateData } from '@/lib/services/firebaseService'
 
 const { Text } = Typography
 
@@ -23,8 +24,9 @@ const C = {
 
 const fmt = (v) => `₹${Number(v || 0).toLocaleString('en-IN')}`
 
-const TransactionHistoryDrawer = ({ open, onClose, member, programId }) => {
+const TransactionHistoryDrawer = ({ open, onClose, member, programId, onDeleteSuccess }) => {
     const { user } = useAuth()
+    const { message, modal } = App.useApp()
     const [transactions, setTransactions] = useState([])
     const [loading, setLoading] = useState(false)
 
@@ -52,6 +54,43 @@ const TransactionHistoryDrawer = ({ open, onClose, member, programId }) => {
         } finally {
             setLoading(false)
         }
+    }
+
+    const handleDeleteTransaction = (txn) => {
+        modal.confirm({
+            title: 'Delete Transaction',
+            content: `Are you sure you want to delete this payment of ${fmt(txn.amount)}? The member's paid amount will be reverted and pending amount will increase.`,
+            okText: 'Yes, Delete',
+            okType: 'danger',
+            cancelText: 'Cancel',
+            onOk: async () => {
+                try {
+                    const path = `/users/${user.uid}/programs/${programId}/joinFeesTransactions`
+                    await deleteData(path, txn.id)
+
+                    const currentPaid = member?.joinFeesPaidAmount || 0
+                    const totalFees = member?.joinFees || 0
+                    const newPaid = Math.max(0, currentPaid - (txn.amount || 0))
+
+                    await updateData(
+                        `/users/${user.uid}/programs/${programId}/members`,
+                        member.id,
+                        {
+                            joinFeesPaidAmount: newPaid,
+                            joinFeesRemainingAmount: totalFees - newPaid,
+                            joinFeesDone: newPaid >= totalFees,
+                        }
+                    )
+
+                    await fetchTransactions()
+                    if (onDeleteSuccess) onDeleteSuccess()
+                    message.success('Transaction deleted successfully')
+                } catch (error) {
+                    console.error('Error deleting transaction:', error)
+                    message.error('Failed to delete transaction')
+                }
+            }
+        })
     }
 
     // Add null checks here
@@ -137,15 +176,19 @@ const TransactionHistoryDrawer = ({ open, onClose, member, programId }) => {
                         style={{ marginTop: 40 }}
                     />
                 ) : (
-                    <Timeline>
-                        {transactions.map((txn, index) => (
-                            <Timeline.Item key={index} color="green" dot={<CheckCircleOutlined style={{ fontSize: 14 }} />}>
+                    <Timeline
+                        items={transactions.map((txn, index) => ({
+                            key: index,
+                            color: 'green',
+                            dot: <CheckCircleOutlined style={{ fontSize: 14 }} />,
+                            children: (
                                 <div style={{ 
                                     marginBottom: 16, 
                                     padding: '12px', 
                                     background: '#fff', 
                                     borderRadius: 8,
-                                    border: '1px solid #e5e7eb'
+                                    border: '1px solid #e5e7eb',
+                                    position: 'relative'
                                 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 8 }}>
                                         <div>
@@ -156,9 +199,17 @@ const TransactionHistoryDrawer = ({ open, onClose, member, programId }) => {
                                                 {txn.paymentDate ? dayjs(txn.paymentDate.toDate()).format('DD MMM YYYY, hh:mm A') : 'Date not available'}
                                             </div>
                                         </div>
-                                        <Tag color={txn.paymentMode === 'cash' ? 'blue' : 'purple'} style={{ fontSize: 11 }}>
-                                            {txn.paymentMode === 'cash' ? '💰 CASH' : '💳 ONLINE'}
-                                        </Tag>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <Tag color={txn.paymentMode === 'cash' ? 'blue' : 'purple'} style={{ fontSize: 11 }}>
+                                                {txn.paymentMode === 'cash' ? '💰 CASH' : '💳 ONLINE'}
+                                            </Tag>
+                                            <DeleteOutlined
+                                                onClick={() => handleDeleteTransaction(txn)}
+                                                style={{ fontSize: 14, color: '#ef4444', cursor: 'pointer', opacity: 0.6 }}
+                                                onMouseEnter={e => e.target.style.opacity = 1}
+                                                onMouseLeave={e => e.target.style.opacity = 0.6}
+                                            />
+                                        </div>
                                     </div>
                                     
                                     {txn.transactionId && (
@@ -184,9 +235,9 @@ const TransactionHistoryDrawer = ({ open, onClose, member, programId }) => {
                                         {txn.agentId && <span>Agent ID: {txn.agentId}</span>}
                                     </div>
                                 </div>
-                            </Timeline.Item>
-                        ))}
-                    </Timeline>
+                            )
+                        }))}
+                    />
                 )}
             </div>
         </Drawer>
