@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
-import { Modal, Tabs, Button, Tag, Card, Descriptions, Input, Collapse, Empty, Row, Col, Statistic, Divider, message, Popconfirm } from 'antd';
+import { Modal, Tabs, Button, Tag, Card, Descriptions, Input, Collapse, Empty, Row, Col, Statistic, Divider, Alert, App } from 'antd';
 import { 
   EyeOutlined, 
   EditOutlined, 
@@ -17,8 +17,12 @@ import {
   StarFilled
 } from '@ant-design/icons';
 import { useSelector, useDispatch } from 'react-redux';
+import { setPrograms } from '@/redux/slices/commonSlice';
 import AddProgramEdit from '@/components/common/program/AddProgramEdit';
 import { deleteProgram, updateProgram } from '@/lib/services/firebaseService';
+import { collection, getDocs, limit, query } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { useAuth } from '@/lib/AuthProvider';
 import AddProgram from '@/components/common/program';
 
 const { Panel } = Collapse;
@@ -26,6 +30,8 @@ const { Meta } = Card;
 
 const Programs = () => {
   const dispatch = useDispatch();
+  const { user } = useAuth();
+  const { message, modal } = App.useApp();
   const programsList = useSelector((state) => state.data.programList);
   
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -62,25 +68,61 @@ const Programs = () => {
 
   const handleDelete = async (programId) => {
     try {
-      // Call delete service
-      await deleteProgram(programId);
-      message.success('Program deleted successfully!');
-      // Refresh programs list or update state
+      if (!user?.uid) {
+        message.error('User not authenticated');
+        return;
+      }
+      const doDelete = async () => {
+        await deleteProgram(user.uid, programId);
+        dispatch(setPrograms(programsList.filter((p) => p.id !== programId)));
+        message.success('योजना सफलतापूर्वक हटा दी गई!');
+      };
+      // Check if any members are assigned to this yojna
+      const membersRef = collection(db, "users", user.uid, "programs", programId, "members");
+      const memberSnap = await getDocs(query(membersRef, limit(1)));
+      const hasMembers = !memberSnap.empty;
+      if (hasMembers) {
+        // Get count for the warning message
+        const allMembers = await getDocs(membersRef);
+        modal.confirm({
+          title: 'योजना में सदस्य जुड़े हुए हैं',
+          icon: <Alert type="warning" showIcon={false} />,
+          content: (
+            <div>
+              <p>इस योजना में <strong>{allMembers.size}</strong> सदस्य पंजीकृत हैं।</p>
+              <p style={{ color: '#ff4d4f', marginTop: 8, fontWeight: 500 }}>
+                क्या आप वाकई इस योजना को हटाना चाहते हैं?
+              </p>
+            </div>
+          ),
+          okText: 'हाँ, हटाएँ',
+          okType: 'danger',
+          cancelText: 'रद्द करें',
+          onOk: doDelete,
+          onCancel: () => {},
+        });
+      } else {
+        await doDelete();
+      }
     } catch (error) {
       console.error('Error deleting program:', error);
-      message.error('Failed to delete program.');
+      message.error('योजना हटाने में विफल।');
     }
   };
 
   const handleSetSelected = async (programId) => {
     try {
+      if (!user?.uid) {
+        message.error('User not authenticated');
+        return;
+      }
       // Update the program to be selected
-      await updateProgram(programId, { isSelected: true });
+      await updateProgram(user.uid, programId, { isSelected: true });
       
       // Set all other programs to isSelected: false
       programsList.forEach(async (program) => {
         if (program.id !== programId) {
-          await updateProgram(program.id, { isSelected: false });
+          await updateProgram(user.uid, program.id, { isSelected: false });
         }
       });
       
@@ -347,22 +389,15 @@ const Programs = () => {
                   >
                     Edit
                   </Button>,
-                  <Popconfirm
-                    title="Delete Program"
-                    description="Are you sure you want to delete this program?"
-                    onConfirm={() => handleDelete(program.id)}
-                    okText="Yes"
-                    cancelText="No"
+                  <Button 
+                    type="text" 
+                    danger 
+                    icon={<DeleteOutlined />}
+                    onClick={() => handleDelete(program.id)}
+                    key="delete"
                   >
-                    <Button 
-                      type="text" 
-                      danger 
-                      icon={<DeleteOutlined />}
-                      key="delete"
-                    >
-                      Delete
-                    </Button>
-                  </Popconfirm>
+                    Delete
+                  </Button>
                 ]}
               >
                 <div className="mb-4">

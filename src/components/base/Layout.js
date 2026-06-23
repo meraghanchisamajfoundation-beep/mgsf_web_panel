@@ -6,10 +6,11 @@ import TopBar from './TopBar';
 import SideBar from './SideBar';
 import { db } from '@/lib/firebase';
 import { collection, doc, getDoc, getDocs, orderBy, query } from 'firebase/firestore';
-import { setAgentList, setgetAgentDataChange, setPrograms, setSelectedProgram, setTrustData } from '@/redux/slices/commonSlice';
+import { setAgentList, setClosingGroups, setgetAgentDataChange, setPrograms, setSelectedProgram, setTrustData } from '@/redux/slices/commonSlice';
 import { useDispatch, useSelector } from 'react-redux';
 import { FiLayers } from 'react-icons/fi';
 import { TrsutData } from '@/lib/constentData';
+import GlobalPdfWidget from './Globalpdfwidget';
 
 // ─── Skeleton loader ────────────────────────────────────────────────────────
 const SkeletonRow = ({ w = 'w-full', h = 'h-4', className = '' }) => (
@@ -171,15 +172,20 @@ export default function CustomDashboardLayout({ children }) {
     } catch (e) { console.error(e); }
   };
 
-  const getProgramData = async () => {
+  const getProgramData = async() => {
     try {
-      const col = collection(db, "users", user.uid, "programs");
-      const snap = await getDocs(query(col, orderBy('createdAt', 'desc')));
-      const programs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      dispatch(setPrograms(programs));
-      dispatch(setSelectedProgram(programs[0] || null));
-    } catch (e) { console.error(e); }
-  };
+     const programsCollection = collection(db,"users",user.uid,"programs");
+      const programsQuery = query(programsCollection, orderBy('createdAt', 'desc'));
+      const querySnapshot = await getDocs(programsQuery);
+      const programs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log(programs,"programs")
+  dispatch(setPrograms(programs))
+  fetchClosingGroups(programs[0]?.id)
+   dispatch(setSelectedProgram(programs[0] || null));
+} catch (error) {
+  console.error("Error fetching programs data:", error);  
+}
+  }
         const fetchTrustData = async () => {
               try {
                   const snap = await getDoc(doc(db, "users", user.uid, "organizations", "trustInfo"));
@@ -196,7 +202,25 @@ export default function CustomDashboardLayout({ children }) {
               }
           };
 
-
+  const fetchClosingGroups = async (programId) => {
+     if (!user?.uid || !programId) return;
+      try {
+        const groupsRef = collection(
+          db, `users/${user.uid}/programs/${programId}/closing_groups`
+        );
+        const snap = await getDocs(groupsRef);
+        const newData=snap.docs.map((doc) => ({
+          id: doc.id,
+          name: doc.data().name,
+          memberCount: doc.data().memberCount || 0,
+          members: doc.data().members || [],
+        }))
+        dispatch(setClosingGroups(newData))
+      } catch (error) {
+        console.error('Error fetching closing groups:', error);
+      } finally {
+      }
+  }
   useEffect(() => {
     if (!loading && !user && !withoutLayout.includes(pathname)) {
       router.replace("/auth/login");
@@ -395,6 +419,7 @@ export default function CustomDashboardLayout({ children }) {
             </div>
           </main>
         </div>
+        <GlobalPdfWidget />
       </div>
     </>
   );

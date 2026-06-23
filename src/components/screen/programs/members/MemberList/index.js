@@ -14,7 +14,7 @@ import { MdOutlinePendingActions } from 'react-icons/md';
 import { GrCertificate } from 'react-icons/gr';
 import {
     Avatar, Button, Dropdown, Tag, Tooltip, Select,
-    DatePicker, Modal, Badge, Divider, message
+    DatePicker, Modal, Badge, Divider, message, Input
 } from 'antd';
 import { useDispatch, useSelector } from 'react-redux';
 import { getData } from '@/lib/services/firebaseService';
@@ -32,6 +32,7 @@ import isBetween from 'dayjs/plugin/isBetween';
 import { fetchSingleMemberMarriageReport } from '@/lib/helper';
 import MemberPaymentDetails from './MemberPaymentDetails';
 import MemberExportPDF from './MemberExportPDF';
+import JoinFeesMemberList from './JoinFeesCom/JoinFeesMemberList';
 
 dayjs.extend(isBetween);
 
@@ -114,6 +115,7 @@ const MemberList = () => {
     const [isFilterModalOpen,    setIsFilterModalOpen]    = useState(false);
 
     // committed filter values
+    const [searchText,           setSearchText]           = useState('');
     const [statusFilter,         setStatusFilter]         = useState('active');
     const [genderFilter,         setGenderFilter]         = useState('all');
     const [selectedAgentFilter,  setSelectedAgentFilter]  = useState(null);
@@ -126,6 +128,11 @@ const MemberList = () => {
     const [draftAgent,           setDraftAgent]           = useState(null);
     const [draftDateRange,       setDraftDateRange]       = useState(null);
     const [draftJoinFees,        setDraftJoinFees]        = useState('all');
+
+    const [JoinFeesMemberListOpen, setJoinFeesMemberListOpen] = useState(false);
+    
+    const [isCertDownloading, setIsCertDownloading] = useState(false);
+
 
     const dispatch           = useDispatch();
     const memberStatusChange = useSelector(s => s.data.getMemberDataChange);
@@ -188,6 +195,7 @@ const MemberList = () => {
         const ag = opts.agent     ?? selectedAgentFilter;
         const dr = opts.dateRange ?? dateRange;
         const jf = opts.joinFees  ?? joinFeesFilter;
+        const st = opts.searchText ?? searchText;
 
         let out = [...data];
 
@@ -217,8 +225,24 @@ const MemberList = () => {
             });
         }
 
+        if (st) {
+            const q = st.toLowerCase();
+            out = out.filter(m =>
+                (m.displayName?.toLowerCase() || '').includes(q) ||
+                (m.registrationNumber?.toLowerCase() || '').includes(q) ||
+                (m.fatherName?.toLowerCase() || '').includes(q) ||
+                (m.aadhaarNo || '').includes(q) ||
+                (m.phone || '').includes(q) ||
+                (m.village?.toLowerCase() || '').includes(q) ||
+                (m.jati?.toLowerCase() || '').includes(q) ||
+                (m.city?.toLowerCase() || '').includes(q) ||
+                (m.district?.toLowerCase() || '').includes(q) ||
+                (m.state?.toLowerCase() || '').includes(q)
+            );
+        }
+
         return out;
-    }, [statusFilter, genderFilter, selectedAgentFilter, dateRange, joinFeesFilter]);
+    }, [statusFilter, genderFilter, selectedAgentFilter, dateRange, joinFeesFilter, searchText]);
 
     // ── fetch ──────────────────────────────────────────────────────────────────
     const onGridReady = useCallback(async () => {
@@ -326,15 +350,6 @@ const MemberList = () => {
             field: 'registrationNumber', headerName: 'Reg. Number', cellDataType: 'text',
             cellRenderer: ({ data }) => <div className="font-semibold">{data.registrationNumber || '—'}</div>
         },
-         { 
-            field: "applicationNumber", 
-            headerName: "Application Number", 
-            cellDataType: "text",
-            cellRenderer: (props) => {
-                const regNo = props.data.applicationNumber;
-                return <div className="font-semibold">{regNo || '-'}</div>;
-            }
-        },
         { field: 'phone', headerName: 'Phone', width: 120, cellDataType: 'text' },
         {
             field: 'gender', headerName: 'Gender', width: 100,
@@ -344,7 +359,7 @@ const MemberList = () => {
                 return <Tag color={g === 'male' ? 'blue' : g === 'female' ? 'pink' : 'default'} className="capitalize">{g}</Tag>;
             }
         },
-        { field: 'state',       headerName: 'State',      width: 100, cellDataType: 'text' },
+        { field: 'village',       headerName: 'Village',      width: 100, cellDataType: 'text' },
         { field: 'addedByName', headerName: 'Created By', cellRenderer: ({ data }) => <div>{data.addedByName}</div> },
         { field: 'aadhaarNo',   headerName: 'Aadhaar No', cellDataType: 'text' },
         {
@@ -446,7 +461,61 @@ const MemberList = () => {
             }
         },
     ];
+  const downloadMultipleCertificates = async (membersArray, selectedProgram) => {
+        if (!membersArray || membersArray.length === 0) {
+            message.warning('No members selected for certificate download');
+            return;
+        }
 
+        setIsCertDownloading(true);
+        const loadingMessage = message.loading('Generating certificates, please wait...', 0);
+
+        const membersData = membersArray.map(member => ({
+            ...member,
+            agentPhone: agentsList?.find(a => a.id === member.agentId)?.phone || 'N/A'
+        }));
+
+        try {
+            const response = await fetch('/api/certificate-send', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    memberData: membersData,
+                    selectedProgram: selectedProgram
+                }),
+            });
+
+            const data = await response.json();
+            
+            const binaryString = atob(data.base64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            
+            const blob = new Blob([bytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            
+            // Open in new tab instead of downloading
+            window.open(url, '_blank');
+            
+            // Clean up after a delay
+            setTimeout(() => {
+                URL.revokeObjectURL(url);
+            }, 100);
+            
+            message.success('Certificate generated successfully!');
+            
+        } catch (error) {
+            console.error('Error:', error);
+            message.error('Failed to generate certificates. Please try again.');
+        } finally {
+            loadingMessage();
+            setIsCertDownloading(false);
+        }
+    };
     // ── render ─────────────────────────────────────────────────────────────────
     return (
         <div>
@@ -468,6 +537,17 @@ const MemberList = () => {
                             Filters
                         </Button>
                     </Badge>
+
+                    {/* Global search */}
+                    <Input.Search
+                        placeholder="Search name, reg no, father, aadhaar, phone, village..."
+                        allowClear
+                        value={searchText}
+                        onChange={(e) => setSearchText(e.target.value)}
+                        onSearch={(v) => setSearchText(v)}
+                        style={{ width: 300 }}
+                        size="middle"
+                    />
 
                     {/* Active chips */}
                     {genderFilter !== 'all' && (
@@ -510,6 +590,21 @@ const MemberList = () => {
                     <Tag color="blue" className="text-sm font-medium h-7 flex items-center m-0">
                         {filteredMembersData.length} members
                     </Tag>
+                    <Button 
+                        className="flex items-center gap-1.5 h-9 px-4 rounded-lg bg-red-50 border-red-300 text-red-600 hover:bg-red-100 hover:border-red-400 font-medium"
+                    onClick={() => setJoinFeesMemberListOpen(true)}
+                    >
+                        Join Fees List
+                    </Button>
+                     <Button
+                        icon={<FilePdfOutlined />}
+                        onClick={() => downloadMultipleCertificates(filteredMembersData, selectedProgram)}
+                        loading={isCertDownloading}
+                        disabled={isCertDownloading || filteredMembersData.length === 0}
+                        className="flex items-center gap-1.5 h-9 px-4 rounded-lg bg-green-50 border-green-300 text-green-600 hover:bg-green-100 hover:border-green-400 font-medium"
+                    >
+                        {isCertDownloading ? 'Generating...' : 'Download Certificates'}
+                    </Button>
                     <Button
                         icon={<FilePdfOutlined />}
                         onClick={() => setIsExportOpen(true)}
@@ -712,6 +807,10 @@ const MemberList = () => {
                 filterSummary={filterSummary}
                 programName={selectedProgram?.name || ''}
             />
+            {
+                JoinFeesMemberListOpen &&   <JoinFeesMemberList onSuccess={onGridReady} selectedProgram={selectedProgram} agentData={agentsList?.find(a => a.id === draftAgent)} membersData={filteredMembersData} open={JoinFeesMemberListOpen} onClose={() => setJoinFeesMemberListOpen(false)} />
+            }
+          
 
             {/* ── member modals ─────────────────────────────────────────────── */}
             <MemberDetailsView

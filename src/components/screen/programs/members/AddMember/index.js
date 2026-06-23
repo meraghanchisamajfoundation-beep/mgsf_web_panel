@@ -21,14 +21,14 @@ import ImgCrop from 'antd-img-crop';
 import dayjs from 'dayjs';
 import { useDispatch, useSelector } from 'react-redux';
 // Services Imports
-import { createData, getData } from '@/lib/services/firebaseService';
+import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { uploadFile } from '@/lib/services/storageService';
 import { useAuth } from '@/lib/AuthProvider';
 import { checkAadhaarExists, createMemberInTransaction, generateUnique4Digit, sendFirebaseNotification } from '@/lib/helper';
 import { districtsByState, gender, states } from '@/lib/staticData';
 import { setgetMemberDataChange } from '@/redux/slices/commonSlice';
 import { createMemberAccount, generateMemberPassword } from '@/lib/commonFun';
-import { where } from 'firebase/firestore';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -76,6 +76,7 @@ const AddMember = () => {
   const [documentFront, setDocumentFront] = useState([]);
   const [documentBack, setDocumentBack] = useState([]);
   const [guardianDocument, setGuardianDocument] = useState([]);
+  const [guardianDocumentBack, setGuardianDocumentBack] = useState([]);
   const [isAadhaarChecking, setIsAadhaarChecking] = useState(false);
   const [aadhaarError, setAadhaarError] = useState(null);
   // Extra Dynamic Fields State
@@ -135,7 +136,6 @@ const AddMember = () => {
       // Set default join date to today
       form.setFieldsValue({
         dateJoin: dayjs(),
-        jati: 'प्रजापत',
         applicationNumber: ''
       });
       
@@ -150,30 +150,35 @@ const AddMember = () => {
     const programId = form.getFieldValue('program');
     if (!programId || !user?.uid) return;
     
-    const memberCollectionPath = `/users/${user.uid}/programs/${programId}/members`;
-    
-    // Get all members with ordering by applicationNumber descending
-    const members = await getData(
-      memberCollectionPath,
-      [
-        { field: 'delete_flag', operator: '==', value: false },
-      ],
-      { field: 'applicationNumber', direction: 'desc' },
-      1 // Only get the highest one
+    const membersRef = collection(db, "users", user.uid, "programs", programId, "members");
+    const q = query(
+      membersRef,
+      where("delete_flag", "!=", true),
+      where("applicationNumber", "!=", null),
+      limit(1)
     );
+    // Get all members with ordering by applicationNumber descending
+    const snapshot = await getDocs(q);
     
     let maxAppNumber = 5500; // Start from 5500 as base
-    console.log(members,'members')
-    if (members && members.length > 0) {
-      const highestMember = members[0];
-      if (highestMember.applicationNumber ) {
+    if (!snapshot.empty) {
+      const highestMember = snapshot.docs[0].data();
+      if (highestMember.applicationNumber) {
         maxAppNumber = parseInt(highestMember.applicationNumber);
-        console.log('Found max application number:', maxAppNumber);
       }
     }
     
+    // Actually get the max - we need all non-deleted to find the max
+    // Use a simpler approach: fetch all and sort in memory
+    const allSnap = await getDocs(query(membersRef, where("delete_flag", "!=", true)));
+    const allNumbers = allSnap.docs
+      .map(d => parseInt(d.data().applicationNumber))
+      .filter(n => !isNaN(n));
+    if (allNumbers.length > 0) {
+      maxAppNumber = Math.max(...allNumbers);
+    }
+    
     const nextNumber = maxAppNumber + 1;
-  
     
     setNextApplicationNumber(nextNumber);
     setApplicationNumber(nextNumber.toString());
@@ -333,8 +338,6 @@ const AddMember = () => {
       guardian: member.guardian,
       gender: member.gender,
       guardianRelation: member.guardianRelation,
-      jati: member.jati || 'प्रजापत',
-      gotra: member.gotra || '',
       phone: member.phone,
       phoneAlt: member.phoneAlt || '',
       aadhaarNo: member.aadhaarNo,
@@ -425,35 +428,21 @@ const AddMember = () => {
   // Handle Application Number validation
 const checkApplicationNumberDuplicate = async (appNumber, programId) => {
   try {
-    if (!appNumber || !programId) return false;
+    if (!appNumber || !programId || !user?.uid) return false;
 
     const appNumberNum = Number(appNumber);
-
     if (isNaN(appNumberNum)) return false;
 
-    const memberCollectionPath = `/users/${user.uid}/programs/${programId}/members`;
-
-    const members = await getData(
-      memberCollectionPath,
-      [
-        {
-          field: "applicationNumber",
-          operator: "==",
-          value: appNumberNum.toString(),
-        },
-        {
-          field: "delete_flag",
-          operator: "!=",
-          value: true,
-        },
-      ],
-      null,
-      1
+    const membersRef = collection(db, "users", user.uid, "programs", programId, "members");
+    const q = query(
+      membersRef,
+      where("applicationNumber", "==", appNumberNum.toString()),
+      where("delete_flag", "!=", true),
+      limit(1)
     );
+    const snapshot = await getDocs(q);
 
-    console.log(members,"members1234",appNumberNum)
-
-    return members.length > 0;
+    return !snapshot.empty;
   } catch (error) {
     console.log("Duplicate check error:", error);
     return false;
@@ -747,6 +736,13 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
           });
         }
 
+        if (guardianDocumentBack.length && guardianDocumentBack[0].originFileObj) {
+          filesToUpload.push({
+            file: guardianDocumentBack[0].originFileObj,
+            name: 'guardianDocumentBack'
+          });
+        }
+
         const fileUploadPromises = filesToUpload.map(item =>
           uploadFile(`/users/${user.uid}/programs/${values.program}/members`, item.file)
             .then(result => ({ [item.name]: result }))
@@ -774,7 +770,7 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
         guardian: values.guardian,
         gender: values?.gender,
         guardianRelation: values.guardianRelation,
-        jati: values.jati || 'प्रजापत',
+        jati: 'प्रजापत',
         gotra: values.gotra || '',
         phone: values.phone,
         phoneAlt: values.phoneAlt || '',
@@ -822,6 +818,7 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
         documentFrontURL: fileUrls.documentFront?.url || '',
         documentBackURL: fileUrls.documentBack?.url || '',
         guardianDocumentURL: fileUrls.guardianDocument?.url || '',
+        guardianDocumentBackURL: fileUrls.guardianDocumentBack?.url || '',
         extraDetails: extraFields.filter(f => f.label && f.value),
         createdAt: new Date(),
       };
@@ -944,7 +941,6 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
               addedBy: 'admin',
               dateJoin: dayjs(),
               customJoinFeesAmount: 1100,
-              jati: 'प्रजापत'
             }}
             scrollToFirstError
             disabled={loading}
@@ -1047,11 +1043,10 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
                               setStoredBirthDate(null);
                               setStoredJoinDate(dayjs());
                               form.resetFields(['displayName', 'fatherName', 'guardian', 'gender', 'guardianRelation', 
-                                'jati', 'gotra', 'phone', 'phoneAlt', 'aadhaarNo', 'guardianAadharNo', 'bobDate', 'currentAddress', 
+                                'phone', 'phoneAlt', 'aadhaarNo', 'guardianAadharNo', 'bobDate', 'currentAddress', 
                                 'village', 'state', 'district', 'pinCode']);
                               form.setFieldsValue({
                                 dateJoin: dayjs(),
-                                jati: 'प्रजापत'
                               });
                             }}
                           >
@@ -1131,31 +1126,21 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
                 </Row>
   
                 <Row gutter={16}>
-                  <Col span={8}>
-                    <Form.Item
-                      name="jati"
-                      label="जाति (Jati)"
-                      rules={[{ required: true, message: 'आवश्यक' }]}
-                      initialValue="प्रजापत"
-                    >
-                      <Input placeholder="जाति" defaultValue="प्रजापत" />
-                    </Form.Item>
-                  </Col>
-                  <Col span={8}>
-                    <Form.Item
-                      name="gotra"
-                      label="गोत्र (Gotra) (वैकल्पिक)"
-                    >
-                      <Input placeholder="गोत्र" />
-                    </Form.Item>
-                  </Col>
-                  <Col span={8}>
+                  <Col span={12}>
                     <Form.Item
                       name="guardian"
                       label="वारिसदार का नाम"
                       rules={[{ required: true, message: 'आवश्यक' }]}
                     >
                       <Input prefix={<UserOutlined />} placeholder="वारिसदार का नाम" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item
+                      name="gotra"
+                      label="गोत्र (Gotra) (वैकल्पिक)"
+                    >
+                      <Input placeholder="गोत्र" />
                     </Form.Item>
                   </Col>
                 </Row>
@@ -1553,6 +1538,29 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
                               <div>
                                 <UploadOutlined />
                                 <div style={{ marginTop: 8 }}>वारिसदार</div>
+                              </div>
+                            )}
+                          </Upload>
+                        </Form.Item>
+                      </Col>
+
+                      <Col span={8}>
+                        <Form.Item
+                          label="वारिसदार का दस्तावेज़ (पीछे) (Optional)"
+                          tooltip="वारिसदार की आईडी का पिछला भाग अपलोड करें (वैकल्पिक)"
+                        >
+                          <Upload
+                            listType="picture-card"
+                            fileList={guardianDocumentBack}
+                            onChange={handleUploadChange(setGuardianDocumentBack)}
+                            onPreview={onPreview}
+                            beforeUpload={() => false}
+                            maxCount={1}
+                          >
+                            {!guardianDocumentBack.length && (
+                              <div>
+                                <UploadOutlined />
+                                <div style={{ marginTop: 8 }}>वारिसदार (पीछे)</div>
                               </div>
                             )}
                           </Upload>

@@ -5,7 +5,7 @@ import {
 } from '@ant-design/icons';
 import { Button, DatePicker, Drawer, Form, Input, Select, Spin, Upload, message as antMessage, Card, Divider } from 'antd';
 import { auth, db, storage } from '@/lib/firebase';
-import { setDoc, doc, collection, getDoc, updateDoc } from 'firebase/firestore';
+import { setDoc, doc, collection, getDoc, updateDoc, getDocs, query, where } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import dayjs from 'dayjs';
 
@@ -63,6 +63,8 @@ const AgentManagement = ({ agentData = null, mode = 'add', onSuccess,isAgentDraw
         email: agentData.email || '',
         phone: agentData.phone || '',
         dateJoin: agentData.dateJoin ? dayjs(agentData.dateJoin) : dayjs(),
+        agentCode: agentData.agentCode || '',
+        oldAgentId: agentData.oldAgentId || '',
         address: agentData.address || '',
         city: agentData.city || '',
         state: agentData.state || '',
@@ -240,6 +242,9 @@ const AgentManagement = ({ agentData = null, mode = 'add', onSuccess,isAgentDraw
     const agentRef = doc(collection(db, 'users', adminUid, 'agents'), agentUid);
     await setDoc(agentRef, {
       uid: agentUid,
+      agentCode: values.agentCode || '',
+      oldAgentId: values.oldAgentId || '',
+      password: password,
       email: values.email,
       displayName: values.name || '',
       phone: values.phone || '',
@@ -301,6 +306,8 @@ const AgentManagement = ({ agentData = null, mode = 'add', onSuccess,isAgentDraw
     const agentRef = doc(db, 'users', adminUid, 'agents', agentUid);
     await updateDoc(agentRef, {
       displayName: values.name || '',
+      agentCode: values.agentCode || '',
+      oldAgentId: values.oldAgentId || '',
       phone: values.phone || '',
       dateJoin: values.dateJoin ? values.dateJoin.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
       address: values.address || '',
@@ -431,6 +438,39 @@ const AgentManagement = ({ agentData = null, mode = 'add', onSuccess,isAgentDraw
                     rules={[{ required: true, message: 'Please select join date' }]}
                   >
                     <DatePicker className="w-full" size="large" format="DD/MM/YYYY" />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="agentCode"
+                    label="Agent Code"
+                    rules={[
+                      { required: true, message: 'Please enter agent code' },
+                      {
+                        validator: async (_, value) => {
+                          if (!value) return;
+                          const currentUser = auth.currentUser;
+                          if (!currentUser) return;
+                          const adminUid = currentUser.uid;
+                          // Skip check if value unchanged from existing
+                          if (isEditMode && agentData?.agentCode === value) return;
+                          const agentsRef = collection(db, 'users', adminUid, 'agents');
+                          const q = query(agentsRef, where('agentCode', '==', value));
+                          const snapshot = await getDocs(q);
+                          if (!snapshot.empty) {
+                            throw new Error('This agent code is already in use');
+                          }
+                        }
+                      }
+                    ]}
+                  >
+                    <Input placeholder="Agent code" size="large" />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="oldAgentId"
+                    label="Old Agent ID (वैकल्पिक)"
+                  >
+                    <Input placeholder="Previous agent ID if any" size="large" />
                   </Form.Item>
                 </div>
               </Card>

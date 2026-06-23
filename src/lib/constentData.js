@@ -1,5 +1,7 @@
+import heaaderImg from "@/app/api/helperfile/Images/headerImg";
 import logo from "@/app/api/helperfile/Images/logo";
 import semkariLogo from "@/app/api/helperfile/Images/semkariLogo";
+import stampImg from "@/app/api/helperfile/Images/stampImg";
 
 export const TrsutData={
     name:"मेरा घांची समाज फाउंडेशन",
@@ -13,7 +15,8 @@ export const TrsutData={
     regNo:"11637",
     logo:logo,
     RightLogo:null,
-    headerImg:"/Images/headerImg.png",
+    stampImg:stampImg,
+    headerImg:heaaderImg,
     topTitle:[
     
         "॥ श्री गणेशाय नमः ॥",

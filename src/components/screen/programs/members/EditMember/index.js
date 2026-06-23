@@ -19,7 +19,7 @@ import ImgCrop from 'antd-img-crop';
 import dayjs from 'dayjs';
 import { useSelector } from 'react-redux';
 // Services Imports
-import { doc, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, limit, query, updateDoc, where } from 'firebase/firestore';
 import { db, storage } from '@/lib/firebase';
 import { uploadFile } from '@/lib/services/storageService';
 import { useAuth } from '@/lib/AuthProvider';
@@ -76,6 +76,27 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
   const [documentFront, setDocumentFront] = useState([]);
   const [documentBack, setDocumentBack] = useState([]);
   const [guardianDocument, setGuardianDocument] = useState([]);
+
+  const checkApplicationNumberDuplicate = async (appNumber) => {
+    try {
+      if (!appNumber || !programId || !user?.uid) return false;
+      const appNumberNum = Number(appNumber);
+      if (isNaN(appNumberNum)) return false;
+      const membersRef = collection(db, "users", user.uid, "programs", programId, "members");
+      const q = query(
+        membersRef,
+        where("applicationNumber", "==", appNumberNum.toString()),
+        where("delete_flag", "!=", true),
+        limit(1)
+      );
+      const snapshot = await getDocs(q);
+      // Exclude current member from duplicate check
+      return snapshot.docs.some(doc => doc.id !== memberData?.id);
+    } catch (error) {
+      console.log("Duplicate check error:", error);
+      return false;
+    }
+  };
 
   // Extra Dynamic Fields State
   const [extraFields, setExtraFields] = useState([]);
@@ -236,7 +257,6 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
         guardian: memberData.guardian,
         guardianRelation: memberData.guardianRelation,
         gender: memberData.gender,
-        jati: memberData.jati || 'Parjapati',
         gotra: memberData.gotra || '',
         phone: memberData.phone,
         phoneAlt: memberData.phoneAlt || '',
@@ -446,6 +466,14 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
     console.log(values, 'values');
 
     try {
+      // Check for duplicate application number before saving
+      const isDuplicate = await checkApplicationNumberDuplicate(values.applicationNumber);
+      if (isDuplicate) {
+        message.error(`एप्लीकेशन नंबर ${values.applicationNumber} पहले से मौजूद है।`);
+        setLoading(false);
+        return;
+      }
+
       const updatedData = { ...memberData };
 
       // Handle file uploads - only upload new files
@@ -525,7 +553,7 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
         guardian: values.guardian,
         guardianRelation: values.guardianRelation,
         gender: values.gender,
-        jati: values.jati || 'Parjapati',
+        jati: 'प्रजापत',
         gotra: values.gotra || '',
         phone: values.phone,
         phoneAlt: values.phoneAlt || '',
@@ -665,23 +693,33 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
 
             <Row gutter={16}>
               <Col span={8}>
-                <Form.Item
-                  name="applicationNumber"
-                  label="एप्लीकेशन नंबर"
-                  rules={[
-                    { required: true, message: 'एप्लीकेशन नंबर आवश्यक है' },
-                    { 
-                      pattern: /^[0-9]+$/, 
-                      message: 'कृपया केवल संख्याएं दर्ज करें' 
-                    }
-                  ]}
-                  tooltip="एप्लीकेशन नंबर"
-                >
-                  <Input
-                    prefix={<IdcardOutlined />}
-                    placeholder="एप्लीकेशन नंबर"
-                  />
-                </Form.Item>
+                  <Form.Item
+                    name="applicationNumber"
+                    label="एप्लीकेशन नंबर"
+                    rules={[
+                      { required: true, message: 'एप्लीकेशन नंबर आवश्यक है' },
+                      { 
+                        pattern: /^[0-9]+$/, 
+                        message: 'कृपया केवल संख्याएं दर्ज करें' 
+                      },
+                      {
+                        validator: async (_, value) => {
+                          if (!value) return Promise.resolve();
+                          const isDuplicate = await checkApplicationNumberDuplicate(value);
+                          if (isDuplicate) {
+                            return Promise.reject(new Error(`एप्लीकेशन नंबर ${value} पहले से मौजूद है`));
+                          }
+                          return Promise.resolve();
+                        }
+                      }
+                    ]}
+                    tooltip="एप्लीकेशन नंबर"
+                  >
+                    <Input
+                      prefix={<IdcardOutlined />}
+                      placeholder="एप्लीकेशन नंबर"
+                    />
+                  </Form.Item>
               </Col>
               <Col span={8}>
                 <Form.Item
@@ -704,21 +742,12 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
             </Row>
 
             <Row gutter={16}>
-              <Col span={8}>
-                <Form.Item
-                  name="jati"
-                  label="जाति (Jati)"
-                  rules={[{ required: true, message: 'आवश्यक' }]}
-                >
-                  <Input placeholder="जाति" />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
+              <Col span={12}>
                 <Form.Item name="gotra" label="गोत्र (Gotra) (वैकल्पिक)">
                   <Input placeholder="गोत्र" />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col span={12}>
                 <Form.Item
                   name="guardian"
                   label="वारिसदार का नाम"

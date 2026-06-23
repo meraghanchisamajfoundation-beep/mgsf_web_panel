@@ -5,7 +5,7 @@ import {
 } from '@ant-design/icons';
 import { Button, DatePicker, Drawer, Form, Input, Select, Spin, Upload, Card, Divider, App, Checkbox } from 'antd';
 import { auth, db, storage } from '@/lib/firebase';
-import { setDoc, doc, collection } from 'firebase/firestore';
+import { setDoc, doc, collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import dayjs from 'dayjs';
 import { useDispatch } from 'react-redux';
@@ -33,6 +33,7 @@ const AddAgent = () => {
   const [documentList, setDocumentList] = useState([]);
   const [signatureFileList, setSignatureFileList] = useState([]);
   const [sendEmail, setSendEmail] = useState(false);
+  const [nextAgentCode, setNextAgentCode] = useState(null);
 
   const {message:antMessage}=App.useApp()
   const dispatch=useDispatch()
@@ -55,6 +56,7 @@ const AddAgent = () => {
     const pwd = generatePassword();
     setAutoPassword(pwd);
     form.setFieldsValue({ password: pwd });
+    getNextAgentCode();
   };
 
   const closeAgentDrawer = () => {
@@ -65,6 +67,30 @@ const AddAgent = () => {
     setSignatureFileList([]);
     setIsAutoPassword(true);
     setSendEmail(true);
+    setNextAgentCode(null);
+  };
+
+  const getNextAgentCode = async () => {
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+      const adminUid = currentUser.uid;
+      const agentsRef = collection(db, 'users', adminUid, 'agents');
+      const q = query(agentsRef, orderBy('agentCode', 'desc'), limit(1));
+      const snapshot = await getDocs(q);
+      let nextCode = 1001;
+      if (!snapshot.empty) {
+        const maxCode = snapshot.docs[0].data().agentCode;
+        nextCode = (parseInt(maxCode) || 1000) + 1;
+      }
+      setNextAgentCode(nextCode);
+      form.setFieldsValue({ agentCode: String(nextCode) });
+    } catch (error) {
+      console.error('Error getting next agent code:', error);
+      const fallback = 1001;
+      setNextAgentCode(fallback);
+      form.setFieldsValue({ agentCode: String(fallback) });
+    }
   };
 
   const uploadFile = async (uid, file, path) => {
@@ -303,6 +329,9 @@ The Team
 
       const agentData = {
         uid: agentUid,
+        agentCode: values.agentCode || '',
+        oldAgentId: values.oldAgentId || '',
+        password: password,
         email: values.email,
         displayName: values.name || '',
         phone: values.phone || '',
@@ -474,6 +503,37 @@ The Team
                     rules={[{ required: true, message: 'Please select join date' }]}
                   >
                     <DatePicker className="w-full" size="large" format="DD/MM/YYYY" />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="agentCode"
+                    label="Agent Code"
+                    rules={[
+                      { required: true, message: 'Please enter agent code' },
+                      {
+                        validator: async (_, value) => {
+                          if (!value) return;
+                          const currentUser = auth.currentUser;
+                          if (!currentUser) return;
+                          const adminUid = currentUser.uid;
+                          const agentsRef = collection(db, 'users', adminUid, 'agents');
+                          const q = query(agentsRef, where('agentCode', '==', value));
+                          const snapshot = await getDocs(q);
+                          if (!snapshot.empty) {
+                            throw new Error('This agent code is already in use');
+                          }
+                        }
+                      }
+                    ]}
+                  >
+                    <Input placeholder="Auto-generated, you can change it" size="large" />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="oldAgentId"
+                    label="Old Agent ID (वैकल्पिक)"
+                  >
+                    <Input placeholder="Previous agent ID if any" size="large" />
                   </Form.Item>
                 </div>
               </Card>
