@@ -595,7 +595,7 @@ const Certificate=({data,selectedProgram})=>{
                 <Text style={styles.valueText}>{data?.guardian}</Text>
               </View>
               <View style={styles.fieldGroup}>
-                <Text style={styles.labelText}>सम्बन्ध :</Text>
+                <Text style={styles.labelText}>{selectedProgram.isMamera?'हक़दार':'सम्बन्ध'} :</Text>
                 <Text style={styles.valueText}>{data?.guardianRelation}</Text>
               </View>
             </View>
