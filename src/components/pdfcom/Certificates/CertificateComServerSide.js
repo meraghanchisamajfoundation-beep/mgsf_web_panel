@@ -544,7 +544,7 @@ const Certificate=({data,selectedProgram})=>{
             <View style={styles.row}>
               <View style={styles.fieldGroup}>
                 <Text style={styles.labelText}>सदस्यता क्रमांक :</Text>
-                <Text style={styles.valueText}>{data?.registrationNumber}</Text>
+                <Text style={styles.valueText}>{data?.applicationNumber || data?.registrationNumber}</Text>
               </View>
               <View style={styles.fieldGroup}>
                 <Text style={styles.labelText}>जन्मतिथि :</Text>
