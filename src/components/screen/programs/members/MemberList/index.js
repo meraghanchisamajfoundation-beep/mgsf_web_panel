@@ -345,7 +345,7 @@ const MemberList = () => {
             )
         },
         { field: 'fatherName',        headerName: 'Father Name',         width: 150, cellDataType: 'text' },
-        { field: 'jati',              headerName: 'Surname',             width: 150, cellDataType: 'text' },
+        { field: 'gotra',              headerName: 'Gotar',             width: 150, cellDataType: 'text' },
         {
             field: 'registrationNumber', headerName: 'Reg. Number', cellDataType: 'text',
             cellRenderer: ({ data }) => <div className="font-semibold">{data.registrationNumber || '—'}</div>

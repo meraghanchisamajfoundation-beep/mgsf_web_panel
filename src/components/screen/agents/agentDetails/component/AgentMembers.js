@@ -100,7 +100,7 @@ const AgentMembers = ({ agentId, agentInfo }) => {
       } 
     },
     { field: "fatherName", headerName: "Father Name", width: 150, cellDataType: "text" },
-    { field: "jati", headerName: "Surname", width: 150, cellDataType: "text" },
+    { field: "gotra", headerName: "Gotar", width: 150, cellDataType: "text" },
     { field: "registrationNumber", headerName: "Registration Number", cellDataType: "text" },
     { field: "phone", headerName: "Phone", width: 120, cellDataType: "text" },
     { field: "state", headerName: "State", width: 100, cellDataType: "text" },
