@@ -8,13 +8,14 @@ import {
 } from 'ag-grid-community';
 import {
     EyeOutlined, EditOutlined, PlusCircleOutlined, FilterOutlined,
-    ClearOutlined, CalendarOutlined, FilePdfOutlined, DownloadOutlined
+    ClearOutlined, CalendarOutlined, FilePdfOutlined, DownloadOutlined,
+    DeleteOutlined
 } from '@ant-design/icons';
 import { MdOutlinePendingActions } from 'react-icons/md';
 import { GrCertificate } from 'react-icons/gr';
 import {
     Avatar, Button, Dropdown, Tag, Tooltip, Select,
-    DatePicker, Modal, Badge, Divider, message, Input
+    DatePicker, Modal, Badge, Divider, message, Input, App
 } from 'antd';
 import { useDispatch, useSelector } from 'react-redux';
 import { getData } from '@/lib/services/firebaseService';
@@ -140,6 +141,7 @@ const MemberList = () => {
     const agentList          = useSelector(s => s.data.agentList);
     const { agentsList }     = useSelector(s => s.data);
     const { user }           = useAuth();
+    const { modal }          = App.useApp();
     const gridRef            = useRef();
 
     const [windowWidth, setWindowWidth] = useState(
@@ -440,6 +442,17 @@ const MemberList = () => {
                             </Button>
                         ),
                     },
+                    {
+                        key: '4', disabled: isDeleted,
+                        label: (
+                            <Button type="default" size="small" danger
+                                onClick={() => handleDeleteMember(data)}
+                                className="flex items-center gap-1 h-8 rounded-lg"
+                                disabled={isDeleted}>
+                                <DeleteOutlined /> Delete
+                            </Button>
+                        ),
+                    },
                 ];
 
                 return (
@@ -520,6 +533,94 @@ const MemberList = () => {
             setIsCertDownloading(false);
         }
     };
+    // ── Delete member from row dropdown ──────────────────────────────────────────
+    const handleDeleteMember = useCallback((member) => {
+        modal.confirm({
+            title: `Delete Member: ${member.displayName}?`,
+            content: (
+                <div>
+                    <p>This will permanently delete:</p>
+                    <ul>
+                        <li>All uploaded files (photos, documents)</li>
+                        <li>Firebase Auth login account</li>
+                        <li>Member data from this program</li>
+                    </ul>
+                    <p style={{ color: 'red', fontWeight: 'bold' }}>This action cannot be undone!</p>
+                </div>
+            ),
+            okText: 'Yes, Delete',
+            okType: 'danger',
+            cancelText: 'Cancel',
+            onOk: async () => {
+                try {
+                    const memberCollectionPath = `/users/${user.uid}/programs/${selectedProgram?.id}/members`;
+                    const res = await fetch('/api/members', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            memberId: member.id || member.uid,
+                            memberCollectionPath
+                        }),
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        message.success('Member deleted successfully');
+                        dispatch(setgetMemberDataChange(true));
+                    } else {
+                        message.error(data.message);
+                    }
+                } catch (err) {
+                    message.error(err.message);
+                }
+            },
+        });
+    }, [user, selectedProgram, dispatch]);
+
+    // ── Delete member from details drawer ──────────────────────────────────────────
+    const showDeleteConfirm = useCallback((member) => {
+        modal.confirm({
+            title: `Delete Member: ${member.displayName}?`,
+            content: (
+                <div>
+                    <p>This will permanently delete:</p>
+                    <ul>
+                        <li>✔ All uploaded files (photos, documents)</li>
+                        <li>✔ Firebase Auth login account</li>
+                        <li>✔ Member data from this program</li>
+                    </ul>
+                    <p style={{ color: 'red', fontWeight: 'bold' }}>This action cannot be undone!</p>
+                </div>
+            ),
+            okText: 'Yes, Delete',
+            okType: 'danger',
+            cancelText: 'Cancel',
+            onOk: async () => {
+                try {
+                    const memberCollectionPath = `/users/${user.uid}/programs/${selectedProgram?.id}/members`;
+                    const res = await fetch('/api/members', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            memberId: member.id || member.uid,
+                            memberCollectionPath
+                        }),
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        message.success('Member deleted successfully');
+                        setIsDetailsView(false);
+                        setSelectedMember(null);
+                        dispatch(setgetMemberDataChange(true));
+                    } else {
+                        message.error(data.message);
+                    }
+                } catch (err) {
+                    message.error(err.message);
+                }
+            },
+        });
+    }, [user, selectedProgram, dispatch]);
+
     // ── render ─────────────────────────────────────────────────────────────────
     return (
         <div>
@@ -820,7 +921,7 @@ const MemberList = () => {
             <MemberDetailsView
                 isModalVisible={isDetailsView}
                 handleCloseModal={() => setIsDetailsView(false)}
-                showDeleteConfirm={false}
+                showDeleteConfirm={showDeleteConfirm}
                 selectedMember={selectedMember}
             />
             <EditMember

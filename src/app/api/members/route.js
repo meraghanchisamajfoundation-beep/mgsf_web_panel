@@ -143,7 +143,7 @@ export async function PUT(req) {
 export async function DELETE(req) {
   try {
     const body = await req.json();
-    const { memberId,memberCollectionPath } = body;
+    const { memberId, memberCollectionPath } = body;
 
     if (!memberId) {
       return NextResponse.json(
@@ -155,23 +155,47 @@ export async function DELETE(req) {
       );
     }
 
-    // delete auth user
-    await auth.deleteUser(memberId);
-
-    // update firestore member document
+    // get member doc to find file URLs
     const memberRef = db.collection(memberCollectionPath).doc(memberId);
     const memberDoc = await memberRef.get();
+    const memberData = memberDoc.exists ? memberDoc.data() : {};
 
+    // delete auth user
+    try {
+      await auth.deleteUser(memberId);
+    } catch (authErr) {
+      if (authErr.code !== "auth/user-not-found") {
+        console.error("Auth delete error:", authErr.message);
+      }
+    }
+
+    // delete storage files
+    const fileFields = ["photoURL", "extraImageURL", "documentFrontURL", "documentBackURL", "guardianDocumentURL", "guardianDocumentBackURL"];
+    const bucket = admin.storage().bucket();
+    for (const field of fileFields) {
+      const url = memberData[field];
+      if (url && url.startsWith("https://firebasestorage.googleapis.com")) {
+        try {
+          // extract path from URL: /v0/b/{bucket}/o/{encoded-path}?...
+          const match = url.match(/\/o\/(.+?)(\?|$)/);
+          if (match) {
+            const filePath = decodeURIComponent(match[1]);
+            await bucket.file(filePath).delete();
+          }
+        } catch (fileErr) {
+          console.error(`Failed to delete ${field}:`, fileErr.message);
+        }
+      }
+    }
+
+    // delete member document
     if (memberDoc.exists) {
-      await memberRef.update({
-        account_flag: false,
-        uid: null
-      });
+      await memberRef.delete();
     }
 
     return NextResponse.json({
       success: true,
-      message: "Member account deleted successfully"
+      message: "Member deleted successfully (auth + files + document)"
     });
 
   } catch (error) {
