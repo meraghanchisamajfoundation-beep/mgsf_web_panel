@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Button, Drawer, Select, Form, Input, DatePicker, Upload, Card, Row, Col, Divider, Space, Typography, App, Spin, Checkbox, Modal } from 'antd';
+import { Button, Drawer, Select, Form, Input, DatePicker, Upload, Card, Row, Col, Divider, Space, Typography, App, Spin, Checkbox, Modal, AutoComplete } from 'antd';
 import {
   PlusOutlined,
   UserOutlined,
@@ -820,6 +820,7 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
         guardianDocumentURL: fileUrls.guardianDocument?.url || '',
         guardianDocumentBackURL: fileUrls.guardianDocumentBack?.url || '',
         extraDetails: extraFields.filter(f => f.label && f.value),
+        note: values.note || '',
         createdAt: new Date(),
       };
 
@@ -1044,7 +1045,7 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
                               setStoredJoinDate(dayjs());
                               form.resetFields(['displayName', 'fatherName', 'guardian', 'gender', 'guardianRelation', 
                                 'phone', 'phoneAlt', 'aadhaarNo', 'guardianAadharNo', 'bobDate', 'currentAddress', 
-                                'village', 'state', 'district', 'pinCode']);
+                                'village', 'state', 'district', 'pinCode', 'note']);
                               form.setFieldsValue({
                                 dateJoin: dayjs(),
                               });
@@ -1152,17 +1153,13 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
                       label="वारिसदार से संबंध"
                       rules={[{ required: true, message: 'कृपया संबंध चुनें' }]}
                     >
-                      <Select 
-                        placeholder="वारिसदार से संबंध चुनें"
-                        showSearch
-                        optionFilterProp="children"
-                      >
-                        {guardianRelations.map(relation => (
-                          <Option key={relation.value} value={relation.value}>
-                            {relation.label}
-                          </Option>
-                        ))}
-                      </Select>
+                      <AutoComplete
+                        placeholder="वारिसदार से संबंध चुनें या लिखें"
+                        options={guardianRelations.map(r => ({ value: r.value }))}
+                        filterOption={(inputValue, option) =>
+                          option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+                        }
+                      />
                     </Form.Item>
                   </Col>
                   <Col span={8}>
@@ -1393,6 +1390,10 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
                   rules={[{ required: true, message: 'आवश्यक' }]}
                 >
                   <TextArea rows={2} placeholder="पूरा पता" />
+                </Form.Item>
+
+                <Form.Item name="note" label="नोट">
+                  <TextArea rows={2} placeholder="कोई विशेष नोट हो तो लिखें" />
                 </Form.Item>
 
                 {/* दस्तावेज़ और फोटो अपलोड - Only show if not copying from existing */}

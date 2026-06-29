@@ -433,6 +433,15 @@ textAlign:'center'
     bottom:-21,
     fontSize:13,
     color:'#000'
+  },
+  notesSection:{
+    flexDirection:'row',
+    alignItems:'center',
+    gap:5
+  },
+  notetext:{
+    fontSize:12,
+    fontWeight:500
   }
 });
 const calculateAge = (birthDate) => {
@@ -638,7 +647,15 @@ const Certificate=({data,selectedProgram})=>{
               </View>
         
             </View>
-
+{(data?.note?.trim() || selectedProgram?.noteLine?.trim()) ? (
+  <View style={styles.notesSection}>
+    <Text style={styles.labelText}>नोट / सूचना : </Text>
+    <Text style={styles.valueText}>
+      {data?.note?.trim() || selectedProgram?.noteLine?.trim()}
+    </Text>
+  </View>
+) : null}
+         
       
 
           </View>

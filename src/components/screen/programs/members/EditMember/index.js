@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Button, Drawer, Select, Form, Input, DatePicker, Upload, Card, Row, Col, Divider, Space, Typography, App, Spin, Checkbox } from 'antd';
+import { Button, Drawer, Select, Form, Input, DatePicker, Upload, Card, Row, Col, Divider, Space, Typography, App, Spin, Checkbox, AutoComplete } from 'antd';
 import {
   EditOutlined,
   UserOutlined,
@@ -270,6 +270,7 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
         state: memberData.state,
         district: memberData.district,
         pinCode: memberData.pinCode,
+        note: memberData.note || '',
         program: memberData.programId,
         ageGroup: memberData.ageGroup,
         closingMonths: memberData.closingMonths || 0,
@@ -583,6 +584,7 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
         addedByName: values.addedBy === 'agent' ? agentName : 'Admin',
         agentId: values.addedBy === 'agent' ? values.selectedAgent : null,
         extraDetails: extraFields.filter(f => f.label && f.value),
+        note: values.note || memberData.note || '',
         updatedAt: new Date(),
       };
 
@@ -765,17 +767,13 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
                   label="वारिसदार से संबंध"
                   rules={[{ required: true, message: 'कृपया संबंध चुनें' }]}
                 >
-                  <Select 
-                    placeholder="वारिसदार से संबंध चुनें"
-                    showSearch
-                    optionFilterProp="children"
-                  >
-                    {guardianRelations.map(relation => (
-                      <Option key={relation.value} value={relation.value}>
-                        {relation.label}
-                      </Option>
-                    ))}
-                  </Select>
+                  <AutoComplete
+                    placeholder="वारिसदार से संबंध चुनें या लिखें"
+                    options={guardianRelations.map(r => ({ value: r.value }))}
+                    filterOption={(inputValue, option) =>
+                      option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+                    }
+                  />
                 </Form.Item>
               </Col>
               <Col span={8}>
@@ -1130,6 +1128,10 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
               rules={[{ required: true, message: 'आवश्यक' }]}
             >
               <TextArea rows={2} placeholder="पूरा पता" />
+            </Form.Item>
+
+            <Form.Item name="note" label="नोट">
+              <TextArea rows={2} placeholder="कोई विशेष नोट हो तो लिखें" />
             </Form.Item>
 
             {/* दस्तावेज़ और फोटो अपलोड */}

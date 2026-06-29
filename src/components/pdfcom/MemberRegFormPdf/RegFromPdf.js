@@ -410,15 +410,11 @@ const RegFormPdf = ({data, selectedProgram}) => {
                 </View>
               </View>
 
-              {/* Gotra, Jati - Two Columns */}
-              <View style={styles.twoColumnRow}>
-                <View style={styles.halfField}>
+              {/* Gotra - Single Column (Removed Jati) */}
+              <View style={styles.fullRow}>
+                <View style={styles.field}>
                   <Text style={styles.label}>गोत्र:</Text>
                   <Text style={styles.value}>{data.gotra}</Text>
-                </View>
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>जाति:</Text>
-                  <Text style={styles.value}>{data.jati}</Text>
                 </View>
               </View>
 
@@ -439,13 +435,16 @@ const RegFormPdf = ({data, selectedProgram}) => {
               </View>
 
               {/* Aadhaar Number */}
-              <View style={[styles.fullRow,{width:'100%'}]}>
-                <View style={styles.field}>
+                         <View style={[styles.twoColumnRow,{width:'100%'}]}>
+                <View style={styles.halfField}>
                   <Text style={styles.label}>आधार नंबर:</Text>
-                  <Text style={styles.value}>{data.aadhaarNo}</Text>
+                  <Text style={[styles.value, { width: '70%' }]}>{data.aadhaarNo}</Text>
+                </View>
+                <View style={styles.halfField}>
+                  <Text style={styles.label}>वारि. आधार:</Text>
+                  <Text style={[styles.value, { width: '70%' }]}>{data.guardianAadharNo || ''}</Text>
                 </View>
               </View>
-
               {/* Village/City */}
               <View style={[styles.fullRow,{width:'100%'}]}>
                 <View style={styles.field}>
@@ -477,6 +476,8 @@ const RegFormPdf = ({data, selectedProgram}) => {
                   <Text style={styles.value}>{data.guardianRelation}</Text>
                 </View>
               </View>
+
+     
 
               {/* Join Fees and Scheme Name - Two Columns */}
               <View style={[styles.twoColumnRow,{width:'100%'}]}>
