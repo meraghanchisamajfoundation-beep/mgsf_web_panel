@@ -358,7 +358,7 @@ const RegFormPdf = ({data, selectedProgram}) => {
                     )}
        
               <View style={styles.schemeBox}>
-                <Text style={styles.schemeText}>सदस्यता फॉर्म</Text>
+                <Text style={styles.schemeText}>{selectedProgram?.hiname} सदस्यता फॉर्म</Text>
               </View>
             </View>
 
@@ -384,7 +384,7 @@ const RegFormPdf = ({data, selectedProgram}) => {
               <View style={styles.twoColumnRow}>
                 <View style={styles.halfField}>
                   <Text style={styles.label}>सदस्यता क्रमांक:</Text>
-                  <Text style={[styles.valueFixed, { minWidth: 65 }]}>{data.registrationNumber}</Text>
+                  <Text style={[styles.valueFixed, { minWidth: 65 }]}>{data?.applicationNumber || data?.registrationNumber}</Text>
                 </View>
                 <View style={styles.halfField}>
                   <Text style={styles.label}>दिनांक:</Text>

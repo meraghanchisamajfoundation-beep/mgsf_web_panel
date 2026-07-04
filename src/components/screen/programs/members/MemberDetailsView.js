@@ -300,7 +300,7 @@ function MemberDetailsView({isModalVisible, handleCloseModal, showDeleteConfirm,
                     <Descriptions.Item label="Registration Number">{selectedMember.registrationNumber}</Descriptions.Item>
                     <Descriptions.Item label="Name">{selectedMember.displayName}</Descriptions.Item>
                     <Descriptions.Item label="Father Name">{selectedMember.fatherName || '-'}</Descriptions.Item>
-                    <Descriptions.Item label="Surname/Jati">{selectedMember.jati || '-'}</Descriptions.Item>
+                    {/* <Descriptions.Item label="Surname/Jati">{selectedMember.jati || '-'}</Descriptions.Item> */}
                     <Descriptions.Item label="Gotra">{selectedMember.gotra || '-'}</Descriptions.Item>
                     <Descriptions.Item label="Phone">{selectedMember.phone}</Descriptions.Item>
                     <Descriptions.Item label="Alternative Phone">{selectedMember.phoneAlt || '-'}</Descriptions.Item>

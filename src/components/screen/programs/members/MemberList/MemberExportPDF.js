@@ -51,7 +51,7 @@ const buildPrintHTML = ({ members, filterSummary, programName, trustData, colors
                 <div class="member-reg">${m.registrationNumber ? `# ${m.registrationNumber}` : ''}</div>
             </td>
             <td class="td">${m.fatherName || '—'}</td>
-            <td class="td">${m.jati || '—'}</td>
+            <td class="td">${m.gotra || '—'}</td>
             <td class="td">${m.phone || '—'}</td>
             <td class="td">${m.state || '—'}</td>
             <td class="td-center">${m.ageGroupRange || '—'}</td>
@@ -434,7 +434,7 @@ tbody tr:last-child td{ border-bottom:none; }
                 <th>#</th>
                 <th>Member Name / Reg. No</th>
                 <th>Father's Name</th>
-                <th>Surname/Caste</th>
+                <th>Gotra</th>
                 <th>Phone Number</th>
                 <th>State</th>
                 <th>Age Group</th>
