@@ -26,6 +26,10 @@ function MemberDetailsView({isModalVisible, handleCloseModal, showDeleteConfirm,
   const selectedProgram = useSelector((state) => state.data.selectedProgram);
   const { message } = App.useApp();
 
+  // Dynamic guardian label based on program
+  const isHaqdarProgram = selectedProgram?.isSuraksha;
+  const guardianLabel = isHaqdarProgram ? "हक़दार" : "Guardian";
+
   // Fetch member transactions when modal opens
   useEffect(() => {
     if (isModalVisible && selectedMember?.id && selectedProgram?.id && user?.uid) {
@@ -284,10 +288,10 @@ function MemberDetailsView({isModalVisible, handleCloseModal, showDeleteConfirm,
                     <div>
                       <img
                         src={selectedMember.extraImageURL}
-                        alt="Guardian"
+                        alt={guardianLabel}
                         className="rounded-lg w-[150px] h-[160px] object-cover"
                       />
-                      <h3 className='text-[12px] font-semibold text-center'>Guardian Image</h3>
+                      <h3 className='text-[12px] font-semibold text-center'>{guardianLabel} Image</h3>
                     </div>
                   )}
                 </div>
@@ -305,7 +309,7 @@ function MemberDetailsView({isModalVisible, handleCloseModal, showDeleteConfirm,
                     <Descriptions.Item label="Phone">{selectedMember.phone}</Descriptions.Item>
                     <Descriptions.Item label="Alternative Phone">{selectedMember.phoneAlt || '-'}</Descriptions.Item>
                     <Descriptions.Item label="Aadhaar Number">{selectedMember.aadhaarNo || '-'}</Descriptions.Item>
-                    <Descriptions.Item label="Guardian Aadhaar">{selectedMember.guardianAadharNo || '-'}</Descriptions.Item>
+                    <Descriptions.Item label={`${guardianLabel} Aadhaar`}>{selectedMember.guardianAadharNo || '-'}</Descriptions.Item>
                     <Descriptions.Item label="Password">{selectedMember.password || '-'}</Descriptions.Item>
                   </Descriptions>
                 </div>
@@ -393,8 +397,8 @@ function MemberDetailsView({isModalVisible, handleCloseModal, showDeleteConfirm,
           
           <TabPane tab="Additional Details" key="2">
             <Descriptions layout="vertical" bordered column={3} size='small'>
-              <Descriptions.Item label="Guardian Name">{selectedMember.guardian || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Guardian Relation">{selectedMember.guardianRelation || '-'}</Descriptions.Item>
+              <Descriptions.Item label={`${guardianLabel} Name`}>{selectedMember.guardian || '-'}</Descriptions.Item>
+              <Descriptions.Item label={`${guardianLabel} Relation`}>{selectedMember.guardianRelation || '-'}</Descriptions.Item>
               <Descriptions.Item label="Gender">{selectedMember.gender || '-'}</Descriptions.Item>
               <Descriptions.Item label="Added By">{selectedMember.addedBy || '-'}</Descriptions.Item>
               <Descriptions.Item label="Added By Name">{selectedMember.addedByName || '-'}</Descriptions.Item>
@@ -464,10 +468,19 @@ function MemberDetailsView({isModalVisible, handleCloseModal, showDeleteConfirm,
               )}
               {selectedMember.guardianDocumentURL && (
                 <div className="relative">
-                  <Title level={5}>Guardian Document</Title>
-                  <img src={selectedMember.guardianDocumentURL} alt="Guardian" className="rounded-lg object-fill h-[200px] w-full" />
+                  <Title level={5}>{guardianLabel} Document</Title>
+                  <img src={selectedMember.guardianDocumentURL} alt={guardianLabel} className="rounded-lg object-fill h-[200px] w-full" />
                   <Tooltip title="Full View" className='absolute top-8 right-2'>
                     <Button icon={<EyeOutlined />} onClick={() => window.open(selectedMember.guardianDocumentURL, '_blank')} />
+                  </Tooltip>
+                </div>
+              )}
+              {selectedMember.guardianDocumentBackURL && (
+                <div className="relative">
+                  <Title level={5}>{guardianLabel} Document Back</Title>
+                  <img src={selectedMember.guardianDocumentBackURL} alt={`${guardianLabel} Back`} className="rounded-lg object-fill h-[200px] w-full" />
+                  <Tooltip title="Full View" className='absolute top-8 right-2'>
+                    <Button icon={<EyeOutlined />} onClick={() => window.open(selectedMember.guardianDocumentBackURL, '_blank')} />
                   </Tooltip>
                 </div>
               )}
@@ -561,7 +574,7 @@ function MemberDetailsView({isModalVisible, handleCloseModal, showDeleteConfirm,
                       <div>🔢 Application Number: <strong>{selectedMember.applicationNumber || '-'}</strong></div>
                       <div>🆔 Registration Number: <strong>{selectedMember.registrationNumber}</strong></div>
                       <div>👤 Aadhaar: {selectedMember.aadhaarNo ? '✓ Verified' : '✗ Not provided'}</div>
-                      <div>👥 Guardian Aadhaar: {selectedMember.guardianAadharNo ? '✓ Provided' : '✗ Not provided'}</div>
+                      <div>👥 {guardianLabel} Aadhaar: {selectedMember.guardianAadharNo ? '✓ Provided' : '✗ Not provided'}</div>
                     </div>
                   </div>
 

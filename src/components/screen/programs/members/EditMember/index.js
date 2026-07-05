@@ -70,12 +70,17 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
   const [selectedLocationGroup, setSelectedLocationGroup] = useState(null);
   const { user } = useAuth();
 
+  // Dynamic guardian label based on program
+  const isHaqdarProgram = selectedProgram?.isSuraksha;
+  const guardianLabel = isHaqdarProgram ? "हक़दार" : "वारिसदार";
+
   // File uploads - Store actual File objects and existing URLs
   const [photo, setPhoto] = useState([]);
   const [extraPhoto, setExtraPhoto] = useState([]);
   const [documentFront, setDocumentFront] = useState([]);
   const [documentBack, setDocumentBack] = useState([]);
   const [guardianDocument, setGuardianDocument] = useState([]);
+  const [guardianDocumentBack, setGuardianDocumentBack] = useState([]);
 
   const checkApplicationNumberDuplicate = async (appNumber) => {
     try {
@@ -246,6 +251,17 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
         }]);
       } else {
         setGuardianDocument([]);
+      }
+
+      if (memberData.guardianDocumentBackURL) {
+        setGuardianDocumentBack([{
+          uid: '-6',
+          name: 'guardian_back.jpg',
+          status: 'done',
+          url: memberData.guardianDocumentBackURL,
+        }]);
+      } else {
+        setGuardianDocumentBack([]);
       }
       
       setAddedBy(memberData.addedBy || 'admin');
@@ -524,6 +540,14 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
         );
       }
 
+      // Guardian Document Back
+      if (guardianDocumentBack.length && guardianDocumentBack[0].originFileObj) {
+        uploadPromises.push(
+          uploadFile(`/users/${user.uid}/programs/${programId}/members`, guardianDocumentBack[0].originFileObj)
+            .then(result => { updatedData.guardianDocumentBackURL = result.url; })
+        );
+      }
+
       // Wait for all uploads
       await Promise.all(uploadPromises);
 
@@ -752,10 +776,10 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
               <Col span={12}>
                 <Form.Item
                   name="guardian"
-                  label="वारिसदार का नाम"
+                  label={`${guardianLabel} का नाम`}
                   rules={[{ required: true, message: 'आवश्यक' }]}
                 >
-                  <Input prefix={<UserOutlined />} placeholder="वारिसदार का नाम" />
+                  <Input prefix={<UserOutlined />} placeholder={`${guardianLabel} का नाम`} />
                 </Form.Item>
               </Col>
             </Row>
@@ -764,11 +788,11 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
               <Col span={8}>
                 <Form.Item
                   name="guardianRelation"
-                  label="वारिसदार से संबंध"
+                  label={`${guardianLabel} से संबंध`}
                   rules={[{ required: true, message: 'कृपया संबंध चुनें' }]}
                 >
                   <AutoComplete
-                    placeholder="वारिसदार से संबंध चुनें या लिखें"
+                    placeholder={`${guardianLabel} से संबंध चुनें या लिखें`}
                     options={guardianRelations.map(r => ({ value: r.value }))}
                     filterOption={(inputValue, option) =>
                       option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
@@ -792,7 +816,7 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
               <Col span={8}>
                 <Form.Item
                   name="guardianAadharNo"
-                  label="वारिसदार का आधार (वैकल्पिक)"
+                  label={`${guardianLabel} का आधार (वैकल्पिक)`}
                   rules={[
                     { len: 12, message: '12 अंक होने चाहिए' },
                     { pattern: /^[0-9]{12}$/, message: 'अमान्य आधार' }
@@ -1251,9 +1275,9 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
 
               <Col span={8}>
                 <Form.Item
-                  label="वारिसदार का दस्तावेज़ *"
+                  label={`${guardianLabel} का दस्तावेज़ *`}
                   required
-                  tooltip="वारिसदार की आईडी अपलोड करें"
+                  tooltip={`${guardianLabel} की आईडी अपलोड करें`}
                 >
                   <Upload
                     listType="picture-card"
@@ -1267,7 +1291,31 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
                     {!guardianDocument.length && (
                       <div>
                         <UploadOutlined />
-                        <div style={{ marginTop: 8 }}>वारिसदार</div>
+                        <div style={{ marginTop: 8 }}>{guardianLabel}</div>
+                      </div>
+                    )}
+                  </Upload>
+                </Form.Item>
+              </Col>
+
+              <Col span={8}>
+                <Form.Item
+                  label={`${guardianLabel} का दस्तावेज़ पिछला भाग (Optional)`}
+                  tooltip={`${guardianLabel} की आईडी का पिछला भाग (वैकल्पिक)`}
+                >
+                  <Upload
+                    listType="picture-card"
+                    fileList={guardianDocumentBack}
+                    onChange={handleUploadChange(setGuardianDocumentBack)}
+                    onPreview={onPreview}
+                    onRemove={handleRemovePhoto}
+                    beforeUpload={() => false}
+                    maxCount={1}
+                  >
+                    {!guardianDocumentBack.length && (
+                      <div>
+                        <UploadOutlined />
+                        <div style={{ marginTop: 8 }}>{guardianLabel} बैक</div>
                       </div>
                     )}
                   </Upload>

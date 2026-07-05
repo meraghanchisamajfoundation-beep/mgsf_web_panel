@@ -70,6 +70,10 @@ const AddMember = () => {
   const [selectedLocationGroup, setSelectedLocationGroup] = useState(null);
   const { user } = useAuth();
 
+  // Dynamic guardian label based on program
+  const isHaqdarProgram = selectedProgram?.isSuraksha;
+  const guardianLabel = isHaqdarProgram ? "हक़दार" : "वारिसदार";
+
   // File uploads - Store actual File objects
   const [photo, setPhoto] = useState([]);
   const [extraPhoto, setExtraPhoto] = useState([]);
@@ -1130,10 +1134,10 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
                   <Col span={12}>
                     <Form.Item
                       name="guardian"
-                      label="वारिसदार का नाम"
+                      label={`${guardianLabel} का नाम`}
                       rules={[{ required: true, message: 'आवश्यक' }]}
                     >
-                      <Input prefix={<UserOutlined />} placeholder="वारिसदार का नाम" />
+                      <Input prefix={<UserOutlined />} placeholder={`${guardianLabel} का नाम`} />
                     </Form.Item>
                   </Col>
                   <Col span={12}>
@@ -1150,11 +1154,11 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
                   <Col span={8}>
                     <Form.Item
                       name="guardianRelation"
-                      label="वारिसदार से संबंध"
+                      label={`${guardianLabel} से संबंध`}
                       rules={[{ required: true, message: 'कृपया संबंध चुनें' }]}
                     >
                       <AutoComplete
-                        placeholder="वारिसदार से संबंध चुनें या लिखें"
+                        placeholder={`${guardianLabel} से संबंध चुनें या लिखें`}
                         options={guardianRelations.map(r => ({ value: r.value }))}
                         filterOption={(inputValue, option) =>
                           option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
@@ -1178,7 +1182,7 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
                   <Col span={8}>
                     <Form.Item
                       name="guardianAadharNo"
-                      label="वारिसदार का आधार (वैकल्पिक)"
+                      label={`${guardianLabel} का आधार (वैकल्पिक)`}
                       rules={[
                         { len: 12, message: '12 अंक होने चाहिए' },
                         { pattern: /^[0-9]{12}$/, message: 'अमान्य आधार' }
@@ -1446,8 +1450,8 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
 
                       <Col span={8}>
                         <Form.Item
-                          label="वारिसदार फोटो (Optional)"
-                          tooltip="वैकल्पिक वारिसदार फोटो (फोटो क्रॉप की जाएगी)"
+                          label={`${guardianLabel} फोटो (Optional)`}
+                          tooltip={`वैकल्पिक ${guardianLabel} फोटो (फोटो क्रॉप की जाएगी)`}
                         >
                           <ImgCrop
                             rotate
@@ -1524,13 +1528,13 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
 
                       <Col span={8}>
                         <Form.Item
-                          label="वारिसदार का दस्तावेज़ (Optional)"
-                          tooltip="वारिसदार की आईडी अपलोड करें (वैकल्पिक)"
+                          label={`${guardianLabel} का दस्तावेज़ (Optional)`}
+                          tooltip={`${guardianLabel} की आईडी अपलोड करें (वैकल्पिक)`}
                         >
                           <Upload
                             listType="picture-card"
                             fileList={guardianDocument}
-                            onChange={handleUploadChange(setGuardianDocument)}
+                            onChange={handleUploadChange('guardianDocument')}
                             onPreview={onPreview}
                             beforeUpload={() => false}
                             maxCount={1}
@@ -1538,17 +1542,16 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
                             {!guardianDocument.length && (
                               <div>
                                 <UploadOutlined />
-                                <div style={{ marginTop: 8 }}>वारिसदार</div>
+                                <div style={{ marginTop: 8 }}>{guardianLabel}</div>
                               </div>
                             )}
                           </Upload>
                         </Form.Item>
                       </Col>
-
                       <Col span={8}>
                         <Form.Item
-                          label="वारिसदार का दस्तावेज़ (पीछे) (Optional)"
-                          tooltip="वारिसदार की आईडी का पिछला भाग अपलोड करें (वैकल्पिक)"
+                          label={`${guardianLabel} का दस्तावेज़ (पीछे) (Optional)`}
+                          tooltip={`${guardianLabel} की आईडी का पिछला भाग अपलोड करें (वैकल्पिक)`}
                         >
                           <Upload
                             listType="picture-card"
@@ -1561,7 +1564,7 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
                             {!guardianDocumentBack.length && (
                               <div>
                                 <UploadOutlined />
-                                <div style={{ marginTop: 8 }}>वारिसदार (पीछे)</div>
+                                <div style={{ marginTop: 8 }}>{guardianLabel} (पीछे)</div>
                               </div>
                             )}
                           </Upload>
