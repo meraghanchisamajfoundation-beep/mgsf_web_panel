@@ -71,7 +71,7 @@ const AddMember = () => {
   const { user } = useAuth();
 
   // Dynamic guardian label based on program
-  const isHaqdarProgram = selectedProgram?.isSuraksha;
+  const isHaqdarProgram = selectedProgram?.isMamera;
   const guardianLabel = isHaqdarProgram ? "हक़दार" : "वारिसदार";
 
   // File uploads - Store actual File objects

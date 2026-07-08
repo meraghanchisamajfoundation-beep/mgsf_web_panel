@@ -27,7 +27,7 @@ function MemberDetailsView({isModalVisible, handleCloseModal, showDeleteConfirm,
   const { message } = App.useApp();
 
   // Dynamic guardian label based on program
-  const isHaqdarProgram = selectedProgram?.isSuraksha;
+  const isHaqdarProgram = selectedProgram?.isMamera;
   const guardianLabel = isHaqdarProgram ? "हक़दार" : "Guardian";
 
   // Fetch member transactions when modal opens

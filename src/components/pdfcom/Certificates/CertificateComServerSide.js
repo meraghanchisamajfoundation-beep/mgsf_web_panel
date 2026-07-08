@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 5,
     paddingHorizontal: 10,
   
   },
@@ -374,7 +374,7 @@ ContentSec:{
   },
   row: {
     flexDirection: 'row',
-    marginBottom: 5,
+    marginBottom: 3,
     alignItems: 'center',
         gap:5
   },
@@ -641,9 +641,13 @@ const Certificate=({data,selectedProgram})=>{
                   fontSize:9.5,
                 }]}>{data?.payAmount}/- रुपये प्रत्येक {selectedProgram?.isSuraksha?'देहांत':selectedProgram?.isMamera?"मायरा":'विवाह'} पर लागू !</Text>
               </View>
-                <View style={styles.fieldGroup}>
+                <View style={[styles.fieldGroup,{position:'relative'}]}>
                 <Text style={styles.labelText}>Agent :</Text>
-                <Text style={styles.valueText}>{data?.agentName || data?.addedByName}</Text>
+                <Text style={[styles.valueText,{
+                  position:'absolute',
+                  right:0,
+                  left:50,
+                }]}>{data?.agentName || data?.addedByName} tem,sf, kjdsbk kjds</Text>
               </View>
         
             </View>
