@@ -647,7 +647,7 @@ const Certificate=({data,selectedProgram})=>{
                   position:'absolute',
                   right:0,
                   left:50,
-                }]}>{data?.agentName || data?.addedByName} tem,sf, kjdsbk kjds</Text>
+                }]}>{data?.agentName || data?.addedByName}</Text>
               </View>
         
             </View>
