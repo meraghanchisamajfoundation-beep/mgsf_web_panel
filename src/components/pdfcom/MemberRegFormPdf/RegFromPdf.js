@@ -348,7 +348,7 @@ const RegFormPdf = ({data, selectedProgram}) => {
                   <Text style={styles.subTitle}>{TrsutData.cityState}</Text>
                 )}
                 {TrsutData.regNo && (
-                  <Text style={styles.regCinText}>{TrsutData.regNo}</Text>
+                  <Text style={styles.regCinText}>Regd No. {TrsutData.regNo}</Text>
                 )}
                 {TrsutData.address && (
                   <Text style={styles.address}>{TrsutData.address}</Text>

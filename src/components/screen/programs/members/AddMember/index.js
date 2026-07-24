@@ -574,6 +574,7 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
       if (file.originFileObj instanceof File) {
         return {
           ...file,
+          status: 'done',
           originFileObj: file.originFileObj,
           url: file.url || URL.createObjectURL(file.originFileObj)
         };
