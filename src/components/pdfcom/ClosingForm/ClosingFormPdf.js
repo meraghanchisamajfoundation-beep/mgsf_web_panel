@@ -592,8 +592,8 @@ const ClosingFormPdf = ({data, selectedProgram,payStatus,paymentData,TrustData})
                   <Text style={styles.value}>{formattedData.gotra}</Text>
                 </View>
                 <View style={styles.halfField}>
-                  <Text style={styles.label}>जाति:</Text>
-                  <Text style={styles.value}>{formattedData.jati}</Text>
+                  <Text style={styles.label}>मोबाईल नंबर:</Text>
+                  <Text style={styles.value}>{formattedData.phone}</Text>
                 </View>
               </View>
 
@@ -607,14 +607,15 @@ const ClosingFormPdf = ({data, selectedProgram,payStatus,paymentData,TrustData})
 
               {/* Mobile Number */}
                     <View style={[styles.twoColumnRow,{width:'100%'}]}>
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>मोबाईल नंबर:</Text>
-                  <Text style={styles.value}>{formattedData.phone}</Text>
-                </View>
-                <View style={styles.halfField}>
+                              <View style={styles.halfField}>
                   <Text style={styles.label}>आधार नंबर:</Text>
                   <Text style={styles.value}>{formattedData.aadhaarNo}</Text>
                 </View>
+                <View style={styles.halfField}>
+                  <Text style={styles.label}>वारिस आधार :</Text>
+                  <Text style={styles.value}>{formattedData.guardianAadharNo || 'xxxxxxxxxxx'}</Text>
+                </View>
+        
               </View>
              
 
