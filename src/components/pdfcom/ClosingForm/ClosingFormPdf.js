@@ -501,7 +501,6 @@ const ClosingFormPdf = ({data, selectedProgram,payStatus,paymentData,TrustData})
     displayName: data.displayName || '-',
     fatherName: data.fatherName || '-',
     gotra: data.gotra || '-',
-    jati: data.jati || '-',
     phone: data.phone || '-',
     aadhaarNo: data.aadhaarNo || '-',
     village: data.village || '-',
@@ -585,7 +584,7 @@ const ClosingFormPdf = ({data, selectedProgram,payStatus,paymentData,TrustData})
                 </View>
               </View>
 
-              {/* Gotra, Jati - Two Columns */}
+              {/* Gotra, Mobile - Two Columns */}
               <View style={styles.twoColumnRow}>
                 <View style={styles.halfField}>
                   <Text style={styles.label}>गोत्र:</Text>

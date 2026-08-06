@@ -609,7 +609,7 @@ const Certificate=({data,selectedProgram})=>{
               </View>
             </View>
 
-            {/* Row 6 - जाति | निवास स्थान */}
+            {/* Row 6 - गोत्र | निवास स्थान */}
             <View style={styles.row}>
               <View style={styles.fieldGroup}>
                 <Text style={styles.labelText}>गोत्र :</Text>

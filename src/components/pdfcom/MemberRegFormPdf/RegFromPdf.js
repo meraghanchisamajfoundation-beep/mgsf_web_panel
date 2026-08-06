@@ -410,7 +410,7 @@ const RegFormPdf = ({data, selectedProgram}) => {
                 </View>
               </View>
 
-              {/* Gotra - Single Column (Removed Jati) */}
+              {/* Gotra - Single Column */}
               <View style={styles.fullRow}>
                 <View style={styles.field}>
                   <Text style={styles.label}>गोत्र:</Text>

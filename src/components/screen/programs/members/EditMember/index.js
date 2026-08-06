@@ -579,7 +579,6 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
         guardian: values.guardian,
         guardianRelation: values.guardianRelation,
         gender: values.gender,
-        jati: 'प्रजापत',
         gotra: values.gotra || '',
         phone: values.phone,
         phoneAlt: values.phoneAlt || '',

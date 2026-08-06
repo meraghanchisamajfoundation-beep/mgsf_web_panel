@@ -420,7 +420,7 @@ console.log(TrustData,'TrustData')
       <View style={styles.memberDetails}>
         <View style={styles.memberNameRow}>
           <Text style={styles.memberName}>
-            {member.displayName} {member.jati || ''}
+            {member.displayName}
           </Text>
           <View style={styles.memberRegBadge}>
             <Text style={styles.memberRegText}>रजि. {member.registrationNumber || 'N/A'}</Text>

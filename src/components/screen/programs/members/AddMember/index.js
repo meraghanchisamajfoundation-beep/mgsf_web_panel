@@ -775,7 +775,6 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
         guardian: values.guardian,
         gender: values?.gender,
         guardianRelation: values.guardianRelation,
-        jati: 'प्रजापत',
         gotra: values.gotra || '',
         phone: values.phone,
         phoneAlt: values.phoneAlt || '',

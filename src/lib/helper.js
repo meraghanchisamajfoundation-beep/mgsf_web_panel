@@ -610,7 +610,6 @@ export const fetchSingleMemberMarriageReport = async ({
         closingMemberName: payment.closingMemberName || "",
         closingRegNo: payment.closingRegNo || "NA",
         closingFatherName: payment.closingFatherName || "NA",
-        closingJati: payment.jati || "NA",
         closingVillage: payment.village || "NA",
         marriageDate: payment.closing_date || "",
         paymentFor: payment.paymentFor || "Marriage Case",

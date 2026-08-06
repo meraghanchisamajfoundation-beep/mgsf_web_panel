@@ -599,11 +599,11 @@ const Certificate = ({data,selectedProgram,TrustData}) => (
               </View>
             </View>
 
-            {/* Row 6 - जाति | निवास स्थान */}
+            {/* Row 6 - गोत्र | निवास स्थान */}
             <View style={styles.row}>
               <View style={styles.fieldGroup}>
-                <Text style={styles.labelText}>जाति :</Text>
-                <Text style={styles.valueText}>{data?.jati}</Text>
+                <Text style={styles.labelText}>गोत्र :</Text>
+                <Text style={styles.valueText}>{data?.gotra}</Text>
               </View>
               <View style={styles.fieldGroup}>
                 <Text style={styles.labelText}>निवास स्थान :</Text>

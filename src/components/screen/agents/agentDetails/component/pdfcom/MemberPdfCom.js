@@ -302,17 +302,14 @@ const styles = StyleSheet.create({
   
   // Column Widths
   colSerial: {
-    width: '7%',
+    width: '8%',
     textAlign: 'center',
   },
   colName: {
-    width: '28%',
+    width: '30%',
   },
   colFatherName: {
-    width: '22%',
-  },
-  colJati: {
-    width: '15%',
+    width: '24%',
   },
   colPhone: {
     width: '18%',
@@ -528,9 +525,6 @@ const MemberListPdf = ({
           <View style={[styles.tableHeaderCell, styles.colFatherName]}>
             <Text>पिता का नाम</Text>
           </View>
-          <View style={[styles.tableHeaderCell, styles.colJati]}>
-            <Text>जाति </Text>
-          </View>
           <View style={[styles.tableHeaderCell, styles.colPhone]}>
             <Text>फोन नंबर</Text>
           </View>
@@ -571,11 +565,6 @@ const MemberListPdf = ({
             {/* Father's Name */}
             <View style={[styles.tableCell, styles.colFatherName]}>
               <Text>{member.fatherName || 'N/A'}</Text>
-            </View>
-            
-            {/* Jati (Surname) */}
-            <View style={[styles.tableCell, styles.colJati]}>
-              <Text>{member.jati || 'N/A'}</Text>
             </View>
             
             {/* Phone Number */}

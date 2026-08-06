@@ -236,7 +236,6 @@ const MemberList = () => {
                 (m.aadhaarNo || '').includes(q) ||
                 (m.phone || '').includes(q) ||
                 (m.village?.toLowerCase() || '').includes(q) ||
-                (m.jati?.toLowerCase() || '').includes(q) ||
                 (m.city?.toLowerCase() || '').includes(q) ||
                 (m.district?.toLowerCase() || '').includes(q) ||
                 (m.state?.toLowerCase() || '').includes(q)
