@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#555',
     marginRight: 3,
-    minWidth: 45,
+    minWidth: 52,
   },
   memberInfoValue: {
     fontSize: 8,
@@ -263,12 +263,12 @@ const styles = StyleSheet.create({
 
   // Column widths
   colSerial:      { width: '6%' },
-  colDate:        { width: '12%' },
-  colBeneficiary: { width: '22%' },
+  colBeneficiary: { width: '28%' },
   colFatherName:  { width: '18%' },
-  colRegNo:       { width: '12%' },
-  colAmount:      { width: '12%' },
-  colStatus:      { width: '12%' },
+  colRegNo:       { width: '11%' },
+  colPhone:       { width: '14%' },
+  colDate:        { width: '12%' },
+  colAmount:      { width: '11%' },
 
   textLeft:   { textAlign: 'left' },
   textCenter: { textAlign: 'center' },
@@ -360,6 +360,31 @@ console.log(TrustData,'TrustData')
     return `₹${num.toLocaleString('hi-IN')}`;
   };
 
+  // ── Member identity ──
+  // Prefer the application number; fall back to the registration number.
+  const hasAppNo = Boolean(member.applicationNumber);
+  const memberCode = member.applicationNumber || member.registrationNumber || 'N/A';
+  const memberCodeLabel = hasAppNo ? 'आवेदन नं.' : 'रजि.';
+
+  // Full name — "नाम / पिता का नाम"
+  const memberFullName =
+    [member.displayName, member.fatherName].filter(Boolean).join(' / ') || 'N/A';
+
+  // हकदार (Mamera) vs वारिसदार (all other programs)
+  const holderLabel = programInfo?.isMamera ? 'हकदार:' : 'वारिसदार:';
+  const holderValue =
+    [member.guardian, member.guardianRelation].filter(Boolean).join(' ') || 'N/A';
+
+  const districtState =
+    [member.district, member.state && `(${member.state})`].filter(Boolean).join(' ') || 'N/A';
+
+  // Beneficiary name for a payment row — "नाम / पिता गाँव"
+  const buildBeneficiaryName = (m = {}) => {
+    const name = m.closingMemberName || m.paymentFor || '-';
+    const place = [m.closingVillage, m.closingState].filter(Boolean).join(' ');
+    return [name, place].filter(Boolean).join(' , ');
+  };
+
   // Get status in Hindi
   const getStatusHindi = (status) => {
     return status === 'paid' ? 'भुगतान किया' : 'बकाया';
@@ -420,10 +445,10 @@ console.log(TrustData,'TrustData')
       <View style={styles.memberDetails}>
         <View style={styles.memberNameRow}>
           <Text style={styles.memberName}>
-            {member.displayName}
+            {memberFullName}
           </Text>
           <View style={styles.memberRegBadge}>
-            <Text style={styles.memberRegText}>रजि. {member.registrationNumber || 'N/A'}</Text>
+            <Text style={styles.memberRegText}>{memberCodeLabel} {memberCode}</Text>
           </View>
         </View>
 
@@ -437,8 +462,16 @@ console.log(TrustData,'TrustData')
             <Text style={styles.memberInfoValue}>{member.phone || 'N/A'}</Text>
           </View>
           <View style={styles.memberInfoGridItem}>
+            <Text style={styles.memberInfoLabel}>{holderLabel}</Text>
+            <Text style={styles.memberInfoValue}>{holderValue}</Text>
+          </View>
+          <View style={styles.memberInfoGridItem}>
             <Text style={styles.memberInfoLabel}>गाँव:</Text>
             <Text style={styles.memberInfoValue}>{member.village || 'N/A'}</Text>
+          </View>
+          <View style={styles.memberInfoGridItem}>
+            <Text style={styles.memberInfoLabel}>जिला & राज्य:</Text>
+            <Text style={styles.memberInfoValue}>{districtState}</Text>
           </View>
           <View style={styles.memberInfoGridItem}>
             <Text style={styles.memberInfoLabel}>योजना:</Text>
@@ -484,14 +517,14 @@ console.log(TrustData,'TrustData')
           <View style={[styles.tableHeaderCell, styles.colRegNo]}>
             <Text style={styles.textCenter}>रजि. नं.</Text>
           </View>
+          <View style={[styles.tableHeaderCell, styles.colPhone]}>
+            <Text style={styles.textCenter}>मोबाइल न.</Text>
+          </View>
            <View style={[styles.tableHeaderCell, styles.colDate]}>
             <Text style={styles.textCenter}>तिथि</Text>
           </View>
-          <View style={[styles.tableHeaderCell, styles.colAmount]}>
+          <View style={[styles.tableHeaderCell, styles.colAmount, { borderRightWidth: 0 }]}>
             <Text style={styles.textRight}>राशि</Text>
-          </View>
-          <View style={[styles.tableHeaderCell, styles.colStatus, { borderRightWidth: 0 }]}>
-            <Text style={styles.textCenter}>स्थिति</Text>
           </View>
         </View>
 
@@ -505,7 +538,7 @@ console.log(TrustData,'TrustData')
             </View>
            
             <View style={[styles.tableCell, styles.colBeneficiary]}>
-              <Text style={styles.textLeft}>{marriage.paymentFor || '-'}</Text>
+              <Text style={styles.textLeft}>{buildBeneficiaryName(marriage)}</Text>
             </View>
             <View style={[styles.tableCell, styles.colFatherName]}>
               <Text style={styles.textLeft}>{marriage.closingFatherName || '-'}</Text>
@@ -513,17 +546,15 @@ console.log(TrustData,'TrustData')
             <View style={[styles.tableCell, styles.colRegNo]}>
               <Text style={styles.textCenter}>{marriage.closingRegNo || '-'}</Text>
             </View>
+            <View style={[styles.tableCell, styles.colPhone]}>
+              <Text style={styles.textCenter}>{marriage.closingPhone || '-'}</Text>
+            </View>
              <View style={[styles.tableCell, styles.colDate]}>
               <Text style={styles.textCenter}>{marriage.marriageDate || '-'}</Text>
             </View>
-            <View style={[styles.tableCell, styles.colAmount]}>
+            <View style={[styles.tableCell, styles.colAmount, { borderRightWidth: 0 }]}>
               <Text style={[styles.textRight, { color: '#cf1322' }]}>
                 {formatCurrency(marriage.amount)}
-              </Text>
-            </View>
-            <View style={[styles.tableCell, styles.colStatus, { borderRightWidth: 0 }]}>
-              <Text style={styles.textCenter}>
-                बकाया
               </Text>
             </View>
           </View>
@@ -536,9 +567,9 @@ console.log(TrustData,'TrustData')
             <View style={[styles.tableCell, styles.colBeneficiary]}><Text> </Text></View>
             <View style={[styles.tableCell, styles.colFatherName]}><Text> </Text></View>
             <View style={[styles.tableCell, styles.colRegNo]}><Text> </Text></View>
+            <View style={[styles.tableCell, styles.colPhone]}><Text> </Text></View>
             <View style={[styles.tableCell, styles.colDate]}><Text> </Text></View>
-            <View style={[styles.tableCell, styles.colAmount]}><Text> </Text></View>
-            <View style={[styles.tableCell, styles.colStatus, { borderRightWidth: 0 }]}><Text> </Text></View>
+            <View style={[styles.tableCell, styles.colAmount, { borderRightWidth: 0 }]}><Text> </Text></View>
           </View>
         ))}
       </View>
@@ -570,7 +601,7 @@ console.log(TrustData,'TrustData')
             </View>
 
             <View style={styles.footer}>
-              <Text style={{ flex: 1 }}>{member.displayName} ({member.registrationNumber})</Text>
+              <Text style={{ flex: 1 }}>{member.displayName} ({memberCode})</Text>
               <Text style={{ flex: 1, textAlign: 'center' }}>पृष्ठ 1</Text>
               <Text style={{ flex: 1, textAlign: 'right' }}>{currentDate}</Text>
             </View>
@@ -626,7 +657,7 @@ console.log(TrustData,'TrustData')
               </View>
 
               <View style={styles.footer}>
-                <Text style={{ flex: 1 }}>{member.displayName} ({member.registrationNumber})</Text>
+                <Text style={{ flex: 1 }}>{member.displayName} ({memberCode})</Text>
                 <Text style={{ flex: 1, textAlign: 'center' }}>पृष्ठ {chunkIndex + 1}</Text>
                 <Text style={{ flex: 1, textAlign: 'right' }}>{currentDate}</Text>
               </View>

@@ -38,8 +38,12 @@ const RED      = '#d6262a';  // org name, registration no, amounts, agent text, 
 const NAVY     = '#1e2938';  // title pill, table header, all borders/grid lines
 const GOLDLINE = '#cda44a';  // thin gold ring on emblem (decorative only)
 const CREAM    = '#fffdf4';  // page background
+const ROWCREAM = '#fdf9e7';  // filled table-row background (pale cream, as in reference)
 const FOOTERBG = '#eceef1';  // light grey founder-info bar background
 const TEXTGREY = '#333333';
+
+// Rows printed on every receipt page (blank rows pad out the remainder)
+const ROWS_PER_PAGE = 10;
 
 // ─── Styles (scaled down for A5) ───────────────────────────────────────────
 const styles = StyleSheet.create({
@@ -68,8 +72,11 @@ const styles = StyleSheet.create({
 
   // ── Header ──────────────────────────────────────────────────────────────
   headerRow: {
-    height:70,
-    width:'100%'
+    height: 70,
+    width: '100%',
+    borderBottomWidth: 1,
+    borderBottomColor: NAVY,
+    paddingBottom: 3,
   },
   logoOuter: {
     width: 44,
@@ -99,23 +106,25 @@ const styles = StyleSheet.create({
   // ── Title pill ──────────────────────────────────────────────────────────
   titleBox: {
     backgroundColor: NAVY,
-    borderRadius: 3,
-    paddingVertical: 3,
-    paddingHorizontal: 16,
+    borderRadius: 11,
+    paddingVertical: 4,
+    paddingHorizontal: 22,
     alignSelf: 'center',
-    marginVertical: 4,
+    marginTop: 7,
+    marginBottom: 7,
   },
   titleText: { fontSize: 11, color: '#fff', fontWeight: 'bold' },
 
   // ── Meta info ───────────────────────────────────────────────────────────
-  metaSection: { flexDirection: 'row', marginBottom: 4 },
-  metaLeft:    { flex: 1.3 },
+  metaSection: { flexDirection: 'row', marginBottom: 6 },
+  metaLeft:    { flex: 1.32 },
   metaRight:   { flex: 1 },
-  metaRow:     { flexDirection: 'row', marginBottom: 3 },
+  metaRow:     { flexDirection: 'row', marginBottom: 4.5, alignItems: 'flex-start' },
   metaLabel:   { fontSize: 7.5, fontWeight: 'bold', color: TEXTGREY, width: 68 },
   metaValue:   { fontSize: 7.5, color: '#000', fontWeight: 'bold', flex: 1 },
   metaLabelR:  { fontSize: 7.5, fontWeight: 'bold', color: TEXTGREY, width: 62 },
   metaValueR:  { fontSize: 7.5, color: '#000', fontWeight: 'bold', flex: 1 },
+  metaSpacer:  { height: 15.5 },
 
   // ── Table ───────────────────────────────────────────────────────────────
   tableWrap: {
@@ -124,7 +133,7 @@ const styles = StyleSheet.create({
   tableHeader: {
     flexDirection: 'row',
     backgroundColor: NAVY,
-    paddingVertical: 4,
+    paddingVertical: 4.5,
   },
   tableHCell: {
     color: '#fff',
@@ -138,9 +147,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderBottomWidth: 0.75,
     borderBottomColor: NAVY,
-    minHeight: 15.5,
+    minHeight: 20,
     backgroundColor: '#ffffff',
   },
+  tableRowFilled: { backgroundColor: ROWCREAM },
   tableRowLast: { borderBottomWidth: 0 },
   tableCell: {
     fontSize: 6.8,
@@ -153,11 +163,11 @@ const styles = StyleSheet.create({
   tableCellLast: { borderRightWidth: 0 },
 
   // Column widths
-  cSerial: { width: '8%',  alignItems: 'center' },
-  cCode:   { width: '10%', alignItems: 'center' },
-  cName:   { width: '50%' },
-  cPhone:  { width: '18%', alignItems: 'center' },
-  cDate:   { width: '14%', alignItems: 'center' },
+  cSerial: { width: '9%',  alignItems: 'center' },
+  cCode:   { width: '11%', alignItems: 'center' },
+  cName:   { width: '54%' },
+  cPhone:  { width: '14%', alignItems: 'center' },
+  cDate:   { width: '12%', alignItems: 'center' },
 
   // ── Amount & agent ──────────────────────────────────────────────────────
   totalSection: {
@@ -207,7 +217,7 @@ const styles = StyleSheet.create({
     borderBottomColor: NAVY,
   },
   founderText: { fontSize: 7.5, color: RED, fontWeight: 'bold', textAlign: 'center' },
-  noteText:    { fontSize: 6.8, color: '#444', marginTop: 3, },
+  noteText:    { fontSize: 6.8, color: '#444', marginTop: 4, textAlign: 'center' },
 
   signRow:     { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'flex-end', marginTop: 4 },
   stampWrap: {
@@ -232,10 +242,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
+    marginTop: -22,   // lets the round stamp overlap the founder bar, as in the reference
   },
   combinedStampSignImg: {
     width: 110,
-    height: 55,
+    height: 62,
     objectFit: 'contain',
   },
 
@@ -263,13 +274,33 @@ const Emblem = ({ logoSrc }) => (
     )
 );
 
+// ─── Name cell builder ─────────────────────────────────────────────────────
+// Reference format: "सुरेश जी /मोहन लाल जी कोरना राजस्थान (सीता देवी)"
+//                    name    /father        village state   (guardian)
+const buildRowName = (row = {}) => {
+  if (!row.name && !row.fatherName) return '';
+  const head = row.fatherName ? `${row.name || ''} /${row.fatherName}` : (row.name || '');
+  const place = [row.address, row.state].filter(Boolean).join(' ');
+  const holder = row.guardian ? `(${row.guardian})` : '';
+  return [head, place, holder].filter(Boolean).join(' ');
+};
+
 // ─── Single Receipt Page ───────────────────────────────────────────────────
 const ReceiptPage = ({ receiptData, pageData,programInfo }) => {
   const {
     receiptNo, date, memberNo, mobile, memberName,
     address, kist, district,state,
+    guardian, guardianRelation, applicationNumber, registrationNumber,
     agentName, agentPhone, founder, logoSrc, signatureSrc, stampSrc,
   } = receiptData;
+
+  // सदस्य क्रमांक — prefer the application number, fall back to the registration number
+  const memberCode =
+    applicationNumber || memberNo || registrationNumber || '-';
+
+  // हकदार / वारिसदार — guardian name followed by the relation (e.g. "शोभा देवी बहिन")
+  const holderLabel = programInfo?.isMamera ? 'हकदार:' : 'वारिसदार:';
+  const holder = [guardian, guardianRelation].filter(Boolean).join(' ') || '-';
 
   return (
     <Page size="A5" style={styles.page}>
@@ -296,7 +327,7 @@ const ReceiptPage = ({ receiptData, pageData,programInfo }) => {
               </View>
               <View style={styles.metaRow}>
                 <Text style={styles.metaLabel}>सदस्य क्रमांक:</Text>
-                <Text style={styles.metaValue}>{memberNo}</Text>
+                <Text style={styles.metaValue}>{memberCode}</Text>
               </View>
               <View style={styles.metaRow}>
                 <Text style={styles.metaLabel}>नाम:</Text>
@@ -321,10 +352,16 @@ const ReceiptPage = ({ receiptData, pageData,programInfo }) => {
                 <Text style={styles.metaLabelR}>मोबाइल नं:</Text>
                 <Text style={styles.metaValueR}>{mobile}</Text>
               </View>
-              <View style={{ height: 32 }} />
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabelR}>{holderLabel}</Text>
+                <Text style={styles.metaValueR}>{holder}</Text>
+              </View>
+              <View style={styles.metaSpacer} />
               <View style={styles.metaRow}>
                 <Text style={styles.metaLabelR}>जिला & राज्य:</Text>
-                <Text style={styles.metaValueR}>{state +", "+district}</Text>
+                <Text style={styles.metaValueR}>
+                  {[district, state && `(${state})`].filter(Boolean).join(' ') || '-'}
+                </Text>
               </View>
             </View>
           </View>
@@ -337,10 +374,10 @@ const ReceiptPage = ({ receiptData, pageData,programInfo }) => {
                 <Text style={{ textAlign: 'center' }}>क्र.स.</Text>
               </View>
               <View style={[styles.cCode, styles.tableHCell]}>
-                <Text style={{ textAlign: 'center' }}>रजि. नं.</Text>
+                <Text style={{ textAlign: 'center' }}>कोड न</Text>
               </View>
               <View style={[styles.cName, styles.tableHCell]}>
-                <Text>नाम / पिता / गाँव</Text>
+                <Text style={{ textAlign: 'center' }}>नाम</Text>
               </View>
               <View style={[styles.cPhone, styles.tableHCell]}>
                 <Text style={{ textAlign: 'center' }}>मोबाइल न.</Text>
@@ -350,29 +387,36 @@ const ReceiptPage = ({ receiptData, pageData,programInfo }) => {
               </View>
             </View>
 
-            {/* Data Rows — always 15 rows, empty rows for remaining */}
-            {pageData.rows.map((row, i) => (
-              <View
-                key={i}
-                style={[styles.tableRow, i === pageData.rows.length - 1 ? styles.tableRowLast : {}]}
-              >
-                <View style={[styles.tableCell, styles.cSerial]}>
-                  <Text style={{ textAlign: 'center' }}>{row.sr ? String(row.sr) : ''}</Text>
+            {/* Data Rows — always ROWS_PER_PAGE rows, blanks pad out the remainder */}
+            {pageData.rows.map((row, i) => {
+              const isFilled = Boolean(row.name || row.regNo || row.phone);
+              return (
+                <View
+                  key={i}
+                  style={[
+                    styles.tableRow,
+                    isFilled ? styles.tableRowFilled : {},
+                    i === pageData.rows.length - 1 ? styles.tableRowLast : {},
+                  ]}
+                >
+                  <View style={[styles.tableCell, styles.cSerial]}>
+                    <Text style={{ textAlign: 'center' }}>{row.sr ? String(row.sr) : ''}</Text>
+                  </View>
+                  <View style={[styles.tableCell, styles.cCode]}>
+                    <Text style={{ textAlign: 'center' }}>{row.regNo ? String(row.regNo) : ''}</Text>
+                  </View>
+                  <View style={[styles.tableCell, styles.cName]}>
+                    <Text>{buildRowName(row)}</Text>
+                  </View>
+                  <View style={[styles.tableCell, styles.cPhone]}>
+                    <Text style={{ textAlign: 'center' }}>{row.phone || ''}</Text>
+                  </View>
+                  <View style={[styles.tableCell, styles.cDate, styles.tableCellLast]}>
+                    <Text style={{ textAlign: 'center' }}>{row.date || ''}</Text>
+                  </View>
                 </View>
-                <View style={[styles.tableCell, styles.cCode]}>
-                  <Text style={{ textAlign: 'center' }}>{row.regNo ? String(row.regNo) : ''}</Text>
-                </View>
-                <View style={[styles.tableCell, styles.cName]}>
-                  <Text>{row.fatherName || row.address ? `${row.name || ''} / ${row.fatherName || ''} / ${row.address || ''}` : (row.name || '')}</Text>
-                </View>
-                <View style={[styles.tableCell, styles.cPhone]}>
-                  <Text style={{ textAlign: 'center' }}>{row.phone || ''}</Text>
-                </View>
-                <View style={[styles.tableCell, styles.cDate, styles.tableCellLast]}>
-                  <Text style={{ textAlign: 'center' }}>{row.date || ''}</Text>
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
           </View>
 
@@ -465,12 +509,17 @@ const ReceiptPage = ({ receiptData, pageData,programInfo }) => {
  * {
  *   receiptNo: '6734',
  *   date: '10-Apr, 2026',
- *   memberNo: '252',
+ *   memberNo: '252',                 // fallback for सदस्य क्रमांक
+ *   applicationNumber: '343',        // preferred for सदस्य क्रमांक (falls back to memberNo/regNo)
+ *   registrationNumber: '252',
+ *   guardian: 'शोभा देवी',           // rendered as हकदार: "शोभा देवी बहिन"
+ *   guardianRelation: 'बहिन',
  *   mobile: '7401001891',
  *   memberName: 'बंशी लाल / धन्ना राम जी',
  *   address: 'सतलाना, सतलाना',
  *   kist: '300',
- *   district: 'जोधपुर (राजस्थान)',
+ *   district: 'जोधपुर',
+ *   state: 'राजस्थान',
  *   agentName: 'सवाई राम धवा',
  *   agentPhone: '6367069841',
  *   founder: 'भागीरथ K. गहलोत 9462860053, 9462304527',
@@ -485,7 +534,9 @@ const ReceiptPage = ({ receiptData, pageData,programInfo }) => {
  *     pageNum: '1/3',
  *     amount: '3000/-',
  *     rows: [
- *       { sr: 1, code: 172, name: 'मुकेश भाई /...', phone: '9909753119', date: '08-Mar, 2026' },
+ *       { sr: 1, regNo: 172, name: 'मुकेश भाई', fatherName: 'रामजी',
+ *         address: 'कोरना', state: 'राजस्थान', guardian: 'सीता देवी',
+ *         phone: '9909753119', date: '08-Mar, 2026' },
  *       // always provide 10 rows; fill missing ones with empty objects {}
  *     ]
  *   },
@@ -513,7 +564,6 @@ const VivahMemoPDF = ({ receiptData = {}, pages = [], members, agentInfo, progra
     const currentDate = new Date().toLocaleDateString('en-IN', {
       day: '2-digit', month: 'short', year: 'numeric'
     });
-    const ROWS_PER_PAGE = 15;
     const formatCurrency = (amount) => {
       const num = parseFloat(amount || 0);
       return `₹${num.toLocaleString('hi-IN')}`;
@@ -530,10 +580,17 @@ const VivahMemoPDF = ({ receiptData = {}, pages = [], members, agentInfo, progra
         receiptNo: member.registrationNumber || `MEM-${mIdx + 1}`,
         date: currentDate,
         memberNo: member.registrationNumber || 'N/A',
+        registrationNumber: member.registrationNumber || 'N/A',
+        applicationNumber: member.applicationNumber || '',
+        guardian: member.guardian || '',
+        guardianRelation: member.guardianRelation || '',
         mobile: member.phone || 'N/A',
-        memberName: member.displayName || 'N/A',
+        memberName: [member.displayName, member.fatherName].filter(Boolean).join(' / ') || 'N/A',
         fatherName: member.fatherName || '-',
-        address: member.village || member.address || 'N/A',
+        address:
+          [member.currentAddress, member.village].filter(Boolean).join(' , ') ||
+          member.address ||
+          'N/A',
         kist: member.payAmount,
         district: member.district || 'राजस्थान',
         state: member.state || '',
@@ -557,13 +614,15 @@ const VivahMemoPDF = ({ receiptData = {}, pages = [], members, agentInfo, progra
           sr: chunkIdx * ROWS_PER_PAGE + ri + 1,
           regNo: m.closingRegNo || '-',
           name: m.closingMemberName || m.paymentFor || '-',
-          fatherName: m.closingFatherName || '-',
-          address: m.closingVillage || '-',
+          fatherName: m.closingFatherName || '',
+          address: m.closingVillage || '',
+          state: m.closingState || '',
+          guardian: m.closingGuardian || '',
           phone: m.closingPhone || '-',
           date: m.marriageDate || '-',
         }));
         for (let i = rows.length; i < ROWS_PER_PAGE; i++) {
-          rows.push({ sr: '', regNo: '', name: '', fatherName: '', address: '', phone: '', date: '' });
+          rows.push({ sr: '', regNo: '', name: '', fatherName: '', address: '', state: '', guardian: '', phone: '', date: '' });
         }
 
         allPages.push(
@@ -587,11 +646,10 @@ const VivahMemoPDF = ({ receiptData = {}, pages = [], members, agentInfo, progra
 
   // ── Mode 1: Receipt (original) ──
   if (pages.length === 0) return emptyDoc;
-  const ROWS_PER_PAGE = 15;
   const normalizedPages = pages.map((page) => {
     const rows = [...(page.rows || [])].slice(0, ROWS_PER_PAGE);
     for (let i = rows.length; i < ROWS_PER_PAGE; i++) {
-      rows.push({ sr: i + 1, regNo: '', name: '', fatherName: '', address: '', phone: '', date: '' });
+      rows.push({ sr: i + 1, regNo: '', name: '', fatherName: '', address: '', state: '', guardian: '', phone: '', date: '' });
     }
     return { ...page, rows };
   });
