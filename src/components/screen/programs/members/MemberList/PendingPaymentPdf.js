@@ -14,6 +14,7 @@ import NotoSansDevanagari from '@/app/api/helperfile/static/font/NotoSansDevanag
 import NotoSansDevanagariBold from '@/app/api/helperfile/static/font/NotoSansDevanagariBold';
 import { pdfColors, TrsutData } from '@/lib/constentData';
 import PdfHeaderCom from '@/components/screen/agents/agentDetails/component/pdfcom/HeaderCom';
+import { getDistrictStateLabel, getStateLabel } from '@/lib/staticData';
 
 Font.register({
   family: 'NotoSansDevanagari',
@@ -409,13 +410,13 @@ const SingleMemberPendingPaymentPdf = ({
   const holderValue =
     [member.guardian, member.guardianRelation].filter(Boolean).join(' ') || 'N/A';
 
-  const districtState =
-    [member.district, member.state && `(${member.state})`].filter(Boolean).join(' ') || 'N/A';
+  // Stored as slugs ("jodhpur"/"rajasthan") — print the Hindi labels
+  const districtState = getDistrictStateLabel(member.district, member.state) || 'N/A';
 
   // Beneficiary name for a payment row — "नाम / पिता गाँव"
   const buildBeneficiaryName = (m = {}) => {
     const name = m.closingMemberName || m.paymentFor || '-';
-    const place = [m.closingVillage, m.closingState].filter(Boolean).join(' ');
+    const place = [m.closingVillage, getStateLabel(m.closingState)].filter(Boolean).join(' ');
     return [name, place].filter(Boolean).join(' , ');
   };
 

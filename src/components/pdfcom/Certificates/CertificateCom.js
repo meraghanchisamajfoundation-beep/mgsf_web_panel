@@ -13,6 +13,7 @@ import NotoSansDevanagari from '@/app/api/helperfile/static/font/NotoSansDevanag
 import NotoSansDevanagariBold from '@/app/api/helperfile/static/font/NotoSansDevanagariBold';
 
 import logo from '@/app/api/helperfile/Images/logo';
+import { getDistrictStateLabel } from '@/lib/staticData';
 // Register Devanagari Font
 Font.register({
   family: 'NotoSansDevanagari',
@@ -619,7 +620,9 @@ const Certificate = ({data,selectedProgram,TrustData}) => (
               </View>
               <View style={styles.fieldGroup}>
                 <Text style={styles.labelText}>जिला & राज्य :</Text>
-                <Text style={styles.valueText}>{data?.district} ({data?.state})</Text>
+                <Text style={styles.valueText}>
+                  {getDistrictStateLabel(data?.district, data?.state)}
+                </Text>
               </View>
             </View>
 

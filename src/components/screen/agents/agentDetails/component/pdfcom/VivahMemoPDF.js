@@ -24,6 +24,7 @@ import NotoSansDevanagari from '@/app/api/helperfile/static/font/NotoSansDevanag
 import NotoSansDevanagariBold from '@/app/api/helperfile/static/font/NotoSansDevanagariBold';
 import { TrustData } from '@/components/screen/settings/organization';
 import { TrsutData } from '@/lib/constentData';
+import { getDistrictLabel, getStateLabel } from '@/lib/staticData';
 
 Font.register({
   family: 'NotoSansDevanagari',
@@ -612,8 +613,9 @@ const VivahMemoPDF = ({
           member.address ||
           'N/A',
         kist: member.payAmount,
-        district: member.district || 'राजस्थान',
-        state: member.state || '',
+        // Stored as slugs ("jodhpur"/"rajasthan") — print the Hindi labels
+        district: getDistrictLabel(member.district, member.state) || 'राजस्थान',
+        state: getStateLabel(member.state),
         agentName: agentInfo?.displayName || agentInfo?.agentName || 'N/A',
         agentPhone: agentInfo?.phone || '',
         founder: TrustData?.founder || 'भागीरथ K. गहलोत',
@@ -636,7 +638,7 @@ const VivahMemoPDF = ({
           name: m.closingMemberName || m.paymentFor || '-',
           fatherName: m.closingFatherName || '',
           address: m.closingVillage || '',
-          state: m.closingState || '',
+          state: getStateLabel(m.closingState),
           guardian: m.closingGuardian || '',
           phone: m.closingPhone || '-',
           date: m.marriageDate || '-',

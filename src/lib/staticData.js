@@ -160,4 +160,63 @@ export const districtsByState =
     { label_en: "Yavatmal", label: "यवतमाल", value: "yavatmal" }
   ]
 };
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Hindi label lookups
+
+   Members store the slug ("rajasthan", "jodhpur"), but PDFs/certificates need
+   the Hindi label ("राजस्थान", "जोधपुर"). These helpers resolve a stored value
+   to its Hindi label and fall back to the original string when it is already
+   Hindi, is an English name, or is simply unknown — so nothing ever renders
+   blank.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const norm = (v) => String(v ?? '').trim().toLowerCase();
+
+const matchOption = (list, value) => {
+  const n = norm(value);
+  if (!n) return null;
+  return (
+    list.find((o) => norm(o.value) === n) ||
+    list.find((o) => norm(o.label) === n) ||
+    list.find((o) => norm(o.label_en) === n) ||
+    null
+  );
+};
+
+/** "rajasthan" → "राजस्थान" */
+export const getStateLabel = (stateValue) => {
+  const found = matchOption(states, stateValue);
+  return found ? found.label : (stateValue || '');
+};
+
+/**
+ * "jodhpur" → "जोधपुर".
+ * Looks inside the given state first, then falls back to scanning every state
+ * (useful when the state is missing or stored inconsistently).
+ */
+export const getDistrictLabel = (districtValue, stateValue) => {
+  if (!districtValue) return '';
+
+  const scoped = districtsByState[norm(stateValue)] || districtsByState[stateValue];
+  if (scoped) {
+    const hit = matchOption(scoped, districtValue);
+    if (hit) return hit.label;
+  }
+
+  for (const list of Object.values(districtsByState)) {
+    const hit = matchOption(list, districtValue);
+    if (hit) return hit.label;
+  }
+
+  return districtValue;
+};
+
+/** "jodhpur" + "rajasthan" → "जोधपुर (राजस्थान)" */
+export const getDistrictStateLabel = (districtValue, stateValue) => {
+  const d = getDistrictLabel(districtValue, stateValue);
+  const s = getStateLabel(stateValue);
+  if (d && s) return `${d} (${s})`;
+  return d || s || '';
+};
   
