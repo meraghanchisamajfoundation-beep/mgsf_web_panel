@@ -13,7 +13,8 @@ import {
     Space,
     Badge,
     Button,
-    Divider
+    Divider,
+    Tooltip
 } from 'antd';
 import { 
     DollarOutlined, 
@@ -37,14 +38,23 @@ function MemberPaymentDetails({ visible, onClose, memberData, paymentReport, loa
     console.log(paymentReport,'paymentReport')
     const selectedProgram = useSelector((state) => state.data.selectedProgram);
     const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+    // Which receipt is being previewed/downloaded: 'pending' | 'paid'
+    const [pdfStatus, setPdfStatus] = useState('pending');
 
-// Update download function
-const handleDownloadPDF = () => {
-    setPdfPreviewOpen(true);
-};
+    const handleDownloadPDF = (status) => {
+        setPdfStatus(status);
+        setPdfPreviewOpen(true);
+    };
+
     if (!memberData || !paymentReport) return null;
     const { report, summary } = paymentReport;
     const member = memberData;
+
+    // Counts per bucket — used to disable a receipt option when there is
+    // nothing to print (a fully paid member has no pending receipt).
+    const pendingCount = (report.marriages || []).filter(m => m.status === 'pending').length;
+    const paidCount    = (report.marriages || []).filter(m => m.status === 'paid').length;
+    const isPaidPdf    = pdfStatus === 'paid';
 
     // Format currency
     const formatCurrency = (amount) => {
@@ -120,7 +130,8 @@ const handleDownloadPDF = () => {
   const getFileName = () => {
     const namePart = member.displayName.replace(/\s+/g, '_');
     const datePart = dayjs().format('YYYYMMDD_HHmmss');
-    return `Payment_Report_${namePart}_${datePart}.pdf`;
+    const kindPart = isPaidPdf ? 'Paid' : 'Pending';
+    return `${kindPart}_Receipt_${namePart}_${datePart}.pdf`;
   }
     return (
         <Drawer
@@ -139,13 +150,31 @@ const handleDownloadPDF = () => {
             loading={loading}
             extra={
                 <div className='flex items-center gap-2'>
-                       <Button type="primary" onClick={handleDownloadPDF}>
-                    Pending PDF Download
-                </Button>
-                <Button onClick={onClose}>Close</Button>
-                    </div>
-                
-             
+                    <Tooltip
+                        title={pendingCount === 0 ? 'No pending payments for this member' : ''}
+                    >
+                        <Button
+                            type="primary"
+                            icon={<ClockCircleOutlined />}
+                            disabled={pendingCount === 0}
+                            onClick={() => handleDownloadPDF('pending')}
+                        >
+                            Pending Receipt ({pendingCount})
+                        </Button>
+                    </Tooltip>
+                    <Tooltip
+                        title={paidCount === 0 ? 'No paid payments for this member' : ''}
+                    >
+                        <Button
+                            icon={<CheckCircleOutlined />}
+                            disabled={paidCount === 0}
+                            onClick={() => handleDownloadPDF('paid')}
+                        >
+                            Paid Receipt ({paidCount})
+                        </Button>
+                    </Tooltip>
+                    <Button onClick={onClose}>Close</Button>
+                </div>
             }
         >
             {/* Summary Cards */}
@@ -251,7 +280,8 @@ const handleDownloadPDF = () => {
                         memberData={member}
                         paymentReport={paymentReport}
                         programInfo={selectedProgram}
-                          TrustData={TrustData}
+                        TrustData={TrustData}
+                        paymentStatus={pdfStatus}
                     />
                 }
                             fileName={getFileName()}
@@ -277,6 +307,7 @@ const handleDownloadPDF = () => {
             paymentReport={paymentReport}
             programInfo={selectedProgram}
             TrustData={TrustData}
+            paymentStatus={pdfStatus}
         />
                 </PDFViewer>
             </Drawer>

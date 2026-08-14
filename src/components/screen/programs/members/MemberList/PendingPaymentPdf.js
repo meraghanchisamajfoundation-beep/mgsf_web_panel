@@ -328,18 +328,52 @@ const styles = StyleSheet.create({
   },
 });
 
-const SingleMemberPendingPaymentPdf = ({ memberData, paymentReport, programInfo = {},TrustData }) => {
+const SingleMemberPendingPaymentPdf = ({
+  memberData,
+  paymentReport,
+  programInfo = {},
+  TrustData,
+  paymentStatus = 'pending',   // 'pending' | 'paid'
+}) => {
   if (!memberData || !paymentReport) return null;
 
-console.log(TrustData,'TrustData')
   const { report } = paymentReport;
   const member = memberData;
-  
-  // Filter ONLY pending marriages
+
+  // ── Which bucket are we printing? ──
+  const isPaid = paymentStatus === 'paid';
+  const wantedStatus = isPaid ? 'paid' : 'pending';
+
+  const L = isPaid
+    ? {
+        reportTitle: 'भुगतान रसीद',
+        tableTitle: 'भुगतान विवरण',
+        countLabel: 'भुगतान',
+        amountLabel: 'भुगतान राशि',
+        summaryCount: 'कुल भुगतान समापन:',
+        summaryAmount: 'कुल भुगतान राशि:',
+        emptyTitle: 'कोई भुगतान नहीं हुआ है',
+        emptyBody: 'इस सदस्य का कोई भी भुगतान दर्ज नहीं है',
+        amountColor: '#237804',
+      }
+    : {
+        reportTitle: 'बकाया भुगतान रिपोर्ट',
+        tableTitle: 'बकाया भुगतान विवरण',
+        countLabel: 'बकाया',
+        amountLabel: 'बकाया राशि',
+        summaryCount: 'कुल बकाया समापन:',
+        summaryAmount: 'कुल बकाया राशि:',
+        emptyTitle: 'कोई बकाया भुगतान नहीं है',
+        emptyBody: 'इस सदस्य का कोई भी भुगतान बकाया नहीं है',
+        amountColor: '#cf1322',
+      };
+
+  // Only the marriages matching the requested status are printed — a member
+  // with nothing in that bucket gets the "nothing here" page instead.
   const allMarriages = report.marriages || [];
-  const pendingMarriages = allMarriages.filter(m => m.status === 'pending');
-  
-  // Calculate summary for pending only
+  const pendingMarriages = allMarriages.filter(m => m.status === wantedStatus);
+
+  // Summary for the selected bucket
   const pendingSummary = {
     totalPending: pendingMarriages.length,
     totalPendingAmount: pendingMarriages.reduce((sum, m) => sum + (parseFloat(m.amount) || 0), 0),
@@ -421,7 +455,7 @@ console.log(TrustData,'TrustData')
           <Text style={styles.address}>{TrustData.address}</Text>
           <Text style={styles.phoneNumbers}>{TrustData.contact}</Text>
           <View style={styles.schemeBox}>
-            <Text style={styles.schemeText}>बकाया भुगतान रिपोर्ट</Text>
+            <Text style={styles.schemeText}>{L.reportTitle}</Text>
           </View>
         </View>
         <Image src={TrustData.logo} style={[styles.logoImage, { width: 80 }]} />
@@ -485,11 +519,11 @@ console.log(TrustData,'TrustData')
             <Text style={styles.statValue}>{pendingSummary.totalPending || 0}</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>बकाया</Text>
+            <Text style={styles.statLabel}>{L.countLabel}</Text>
             <Text style={styles.statValue}>{pendingSummary.totalPending}</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>बकाया राशि</Text>
+            <Text style={styles.statLabel}>{L.amountLabel}</Text>
             <Text style={styles.statValue}>{formatCurrency(pendingSummary.totalPendingAmount)}</Text>
           </View>
         </View>
@@ -553,7 +587,7 @@ console.log(TrustData,'TrustData')
               <Text style={styles.textCenter}>{marriage.marriageDate || '-'}</Text>
             </View>
             <View style={[styles.tableCell, styles.colAmount, { borderRightWidth: 0 }]}>
-              <Text style={[styles.textRight, { color: '#cf1322' }]}>
+              <Text style={[styles.textRight, { color: L.amountColor }]}>
                 {formatCurrency(marriage.amount)}
               </Text>
             </View>
@@ -590,8 +624,8 @@ console.log(TrustData,'TrustData')
             {renderMemberCard()}
             
             <View style={{ padding: 30, alignItems: 'center' }}>
-              <Text style={{ fontSize: 14, color: '#8B0000', marginBottom: 10 }}>कोई बकाया भुगतान नहीं है</Text>
-              <Text style={{ fontSize: 10, color: '#666' }}>इस सदस्य का कोई भी भुगतान बकाया नहीं है</Text>
+              <Text style={{ fontSize: 14, color: '#8B0000', marginBottom: 10 }}>{L.emptyTitle}</Text>
+              <Text style={{ fontSize: 10, color: '#666' }}>{L.emptyBody}</Text>
             </View>
 
             <View style={styles.noticeSection}>
@@ -626,7 +660,7 @@ console.log(TrustData,'TrustData')
               {chunkIndex === 0 && renderMemberCard()}
 
               <Text style={styles.tableSectionTitle}>
-                बकाया भुगतान विवरण {chunks.length > 1 ? `(पृष्ठ ${chunkIndex + 1}/${chunks.length})` : ''}
+                {L.tableTitle} {chunks.length > 1 ? `(पृष्ठ ${chunkIndex + 1}/${chunks.length})` : ''}
               </Text>
 
               {renderPaymentTable(chunk, startIndex, chunkIndex, chunks.length)}
@@ -635,14 +669,14 @@ console.log(TrustData,'TrustData')
               {isLastPage && (
                 <View style={styles.summaryBox}>
                   <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>कुल बकाया समापन:</Text>
-                    <Text style={[styles.summaryValue, { color: '#cf1322' }]}>
+                    <Text style={styles.summaryLabel}>{L.summaryCount}</Text>
+                    <Text style={[styles.summaryValue, { color: L.amountColor }]}>
                       {pendingSummary.totalPending}
                     </Text>
                   </View>
                   <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>कुल बकाया राशि:</Text>
-                    <Text style={[styles.summaryValue, { color: '#cf1322', fontSize: 10 }]}>
+                    <Text style={styles.summaryLabel}>{L.summaryAmount}</Text>
+                    <Text style={[styles.summaryValue, { color: L.amountColor, fontSize: 10 }]}>
                       {formatCurrency(pendingSummary.totalPendingAmount)}
                     </Text>
                   </View>

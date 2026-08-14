@@ -19,8 +19,17 @@ export async function OPTIONS() {
 
 export async function POST(req) {
   try {
-    const { data, summary, agentInfo, programInfo, filters, TrustData } =
-      await req.json();
+    const {
+      data,
+      summary,
+      agentInfo,
+      programInfo,
+      filters,
+      TrustData,
+      paymentStatus = "pending", // 'pending' | 'paid'
+    } = await req.json();
+
+    const status = paymentStatus === "paid" ? "paid" : "pending";
 
     const pdfBuffer = await renderToBuffer(
       <VivahMemoPDF
@@ -28,6 +37,7 @@ export async function POST(req) {
         agentInfo={agentInfo}
         programInfo={programInfo}
         TrustData={TrustData}
+        paymentStatus={status}
       />
     );
 
@@ -36,7 +46,7 @@ export async function POST(req) {
       headers: {
         ...corsHeaders,
         "Content-Type": "application/pdf",
-        "Content-Disposition": 'inline; filename="payment-report.pdf"',
+        "Content-Disposition": `inline; filename="${status}-receipts.pdf"`,
       },
     });
   } catch (error) {

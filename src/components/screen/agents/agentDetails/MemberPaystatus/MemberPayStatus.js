@@ -6,7 +6,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   Table, Card, Row, Col, Statistic, Tag, Button, Avatar, Space,
   Input, Select, Tooltip, Badge, Modal, message, Drawer, Checkbox,
-  Divider, Radio, Spin, Progress, Empty,
+  Divider, Radio, Spin, Progress, Empty, Dropdown,
 } from 'antd';
 import {
   EyeOutlined, DownloadOutlined, ReloadOutlined, MoneyCollectOutlined,
@@ -270,6 +270,7 @@ const { generatePdf } = usePdfGenerator();
         setSelectionMode('custom');
       } else {
         setSelectedMembers([]);
+        setSelectionMode('all');   // nothing ticked = treat as "all members"
       }
     },
     [filteredData]
@@ -279,7 +280,7 @@ const { generatePdf } = usePdfGenerator();
     selectedRowKeys: selectedMembers,
     onChange: (keys) => {
       setSelectedMembers(keys);
-      setSelectionMode('custom');
+      setSelectionMode(keys.length === 0 ? 'all' : 'custom');
       setSelectAll(keys.length === filteredData.length);
     },
   }), [selectedMembers, filteredData.length]);
@@ -295,12 +296,134 @@ const { generatePdf } = usePdfGenerator();
     return `${agentName}_Payment_Report${groupName ? `_${groupName}` : ''}_${programName}_${memberCount}Members_${date}.pdf`;
   }, [agentInfo, selectedProgram, selectionMode, filteredData, selectedMembers, selectedGroupId, closingGroups]);
 
+  // An empty custom selection means "nothing was ticked" — fall back to every
+  // filtered member instead of silently exporting zero members.
   const getExportData = useCallback(
-    () => selectionMode === 'all' ? filteredData : filteredData.filter((m) => selectedMembers.includes(m.memberId)),
+    () =>
+      selectionMode === 'all' || selectedMembers.length === 0
+        ? filteredData
+        : filteredData.filter((m) => selectedMembers.includes(m.memberId)),
     [selectionMode, filteredData, selectedMembers]
   );
 
   const hasActiveFilters = activeFilters.search || activeFilters.status || activeFilters.group;
+
+  // ─── Receipt generation (pending / paid) ──────────────────────────────
+  // A member only lands in a receipt if they actually have entries with that
+  // status — fully paid members are never printed on a pending receipt.
+  const getReceiptMembers = useCallback(
+    (status) =>
+      getExportData()
+        .map((m) => ({
+          ...m,
+          marriages: (m.marriages || []).filter((x) => x.status === status),
+        }))
+        .filter((m) => m.marriages.length > 0),
+    [getExportData]
+  );
+
+  const handleGenerateReceipts = useCallback(
+    (status) => {
+      const receiptMembers = getReceiptMembers(status);
+
+      if (receiptMembers.length === 0) {
+        message.warning(
+          status === 'paid'
+            ? 'No members with paid payments in the current selection.'
+            : 'No members with pending payments in the current selection.'
+        );
+        return;
+      }
+
+      // One combined PDF — one receipt page per member, each listing only that
+      // member's entries with the selected status.
+      const totalRows = receiptMembers.reduce((n, m) => n + m.marriages.length, 0);
+      const skipped = getExportData().length - receiptMembers.length;
+
+      message.loading(
+        `Building 1 PDF · ${receiptMembers.length} ${status} receipt(s) · ${totalRows} closing(s)` +
+          (skipped > 0 ? ` · ${skipped} member(s) skipped (nothing ${status})` : ''),
+        3
+      );
+
+      generatePdf({
+        label: `${agentInfo?.displayName} · ${selectedProgram?.name} · ${
+          status === 'paid' ? 'Paid' : 'Pending'
+        } Receipts`,
+        payload: {
+          data: receiptMembers,
+          summary,
+          agentInfo,
+          programInfo: selectedProgram,
+          filters: activeFilters,
+          TrustData: trustData,
+          paymentStatus: status,
+        },
+      });
+    },
+    [
+      getReceiptMembers,
+      getExportData,
+      generatePdf,
+      agentInfo,
+      selectedProgram,
+      summary,
+      activeFilters,
+      trustData,
+    ]
+  );
+
+  // ── Single-member receipt (table row button) ──────────────────────────
+  // Sirf us member ki, sirf chune hue status ki entries print hoti hain.
+  // 5 paid / 3 pending wale member ka Pending button 3 rows deta hai aur
+  // Paid button 5 rows — dono alag-alag PDF.
+  const handleMemberReceipt = useCallback(
+    (member, status) => {
+      const marriages = (member.marriages || []).filter((m) => m.status === status);
+
+      if (marriages.length === 0) {
+        message.warning(
+          `${member.displayName} ka koi ${status === 'paid' ? 'paid' : 'pending'} payment nahi hai.`
+        );
+        return;
+      }
+
+      message.loading(
+        `${member.displayName} · ${marriages.length} ${status} closing(s) · PDF ban raha hai`,
+        2
+      );
+
+      generatePdf({
+        label: `${member.displayName} · ${status === 'paid' ? 'Paid' : 'Pending'} Receipt`,
+        payload: {
+          data: [{ ...member, marriages }],
+          summary,
+          agentInfo,
+          programInfo: selectedProgram,
+          filters: activeFilters,
+          TrustData: trustData,
+          paymentStatus: status,
+        },
+      });
+    },
+    [generatePdf, summary, agentInfo, selectedProgram, activeFilters, trustData]
+  );
+
+  const receiptMenuItems = useMemo(
+    () => [
+      {
+        key: 'pending',
+        label: `Pending Receipts (${getReceiptMembers('pending').length} members)`,
+        icon: <ClockCircleOutlined />,
+      },
+      {
+        key: 'paid',
+        label: `Paid Receipts (${getReceiptMembers('paid').length} members)`,
+        icon: <CheckCircleOutlined />,
+      },
+    ],
+    [getReceiptMembers]
+  );
 
   // ─── Columns ──────────────────────────────────────────────────────────
   const columns = useMemo(() => [
@@ -398,15 +521,50 @@ const { generatePdf } = usePdfGenerator();
       },
     },
     {
-      title: '', key: 'actions', fixed: 'right', width: 48, align: 'center',
-      render: (_, record) => (
-        <Tooltip title="View Details">
-          <Button type="text" icon={<EyeOutlined />} size="small"
-            onClick={() => { setSelectedMember(record); setIsDetailsModalVisible(true); }} />
-        </Tooltip>
-      ),
+      title: 'Receipt', key: 'actions', fixed: 'right', width: 190, align: 'center',
+      render: (_, record) => {
+        const pendingCount = record.marriages?.filter((m) => m.status === 'pending').length || 0;
+        const paidCount    = record.marriages?.filter((m) => m.status === 'paid').length    || 0;
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+            <Tooltip title="View Details">
+              <Button type="text" icon={<EyeOutlined />} size="small"
+                onClick={() => { setSelectedMember(record); setIsDetailsModalVisible(true); }} />
+            </Tooltip>
+
+            <Tooltip title={pendingCount ? `Download ${pendingCount} pending receipt` : 'Koi pending nahi'}>
+              <Button
+                size="small"
+                danger
+                icon={<DownloadOutlined />}
+                disabled={pendingCount === 0}
+                onClick={() => handleMemberReceipt(record, 'pending')}
+                style={{ fontSize: 11, paddingInline: 6 }}
+              >
+                Pending {pendingCount}
+              </Button>
+            </Tooltip>
+
+            <Tooltip title={paidCount ? `Download ${paidCount} paid receipt` : 'Koi paid nahi'}>
+              <Button
+                size="small"
+                icon={<DownloadOutlined />}
+                disabled={paidCount === 0}
+                onClick={() => handleMemberReceipt(record, 'paid')}
+                style={{
+                  fontSize: 11,
+                  paddingInline: 6,
+                  ...(paidCount ? { color: '#389e0d', borderColor: '#95de64' } : {}),
+                }}
+              >
+                Paid {paidCount}
+              </Button>
+            </Tooltip>
+          </div>
+        );
+      },
     },
-  ], [calculateMemberStats]);
+  ], [calculateMemberStats, handleMemberReceipt]);
 
   const marriageColumns = useMemo(() => [
     {
@@ -484,16 +642,17 @@ const { generatePdf } = usePdfGenerator();
             {programList.map((p) => <Option key={p.id} value={p.id}>{p.name}</Option>)}
           </Select>
           <Button icon={<ReloadOutlined />} onClick={loadAgentPaymentData} loading={loading}>Refresh</Button>
-          <Button type="primary" icon={<FilePdfOutlined />}
-            onClick={()=>{
-              generatePdf({
-  label: `${agentInfo?.displayName} · ${selectedProgram?.name}`,
-  payload: { data: getExportData(), summary, agentInfo, programInfo: selectedProgram, filters: activeFilters, TrustData: trustData },
-});
+          <Dropdown
+            menu={{
+              items: receiptMenuItems,
+              onClick: ({ key }) => handleGenerateReceipts(key),
             }}
-          disabled={filteredData.length === 0}>
-            Generate PDF
-          </Button>
+            disabled={filteredData.length === 0}
+          >
+            <Button type="primary" icon={<FilePdfOutlined />} disabled={filteredData.length === 0}>
+              Generate Receipts
+            </Button>
+          </Dropdown>
         </Space>
       </div>
 

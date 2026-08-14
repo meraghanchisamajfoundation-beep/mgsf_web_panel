@@ -565,7 +565,7 @@ const Certificate=({data,selectedProgram})=>{
             <View style={styles.row}>
               <View style={styles.fieldGroup}>
                 <Text style={styles.labelText}>नाम :</Text>
-                <Text style={styles.valueText}>{data?.displayName}</Text>
+                <Text style={styles.valueText}>{data?.displayName + " "}</Text>
               </View>
               <View style={styles.fieldGroup}>
                 <Text style={styles.labelText}>आधार न . :</Text>
@@ -577,7 +577,7 @@ const Certificate=({data,selectedProgram})=>{
             <View style={styles.row}>
               <View style={styles.fieldGroup}>
                 <Text style={styles.labelText}>पिता/पति का नाम :</Text>
-                <Text style={styles.valueText}>{data?.fatherName}</Text>
+                <Text style={styles.valueText}>{data?.fatherName + " "}</Text>
               </View>
               <View style={styles.fieldGroup}>
                 <Text style={styles.labelText}>उम्र :</Text>
@@ -601,10 +601,10 @@ const Certificate=({data,selectedProgram})=>{
             <View style={styles.row}>
               <View style={styles.fieldGroup}>
                 <Text style={styles.labelText}>वारिसदार :</Text>
-                <Text style={styles.valueText}>{data?.guardian}</Text>
+                <Text style={styles.valueText}>{data?.guardian + " "}</Text>
               </View>
               <View style={styles.fieldGroup}>
-                <Text style={styles.labelText}>{selectedProgram.isMamera?'हक़दार':'सम्बन्ध'} :</Text>
+                <Text style={styles.labelText}>{selectedProgram.isMamera?'हक़दार':'सम्बन्ध'} :</Text>
                 <Text style={styles.valueText}>{data?.guardianRelation}</Text>
               </View>
             </View>
@@ -647,7 +647,7 @@ const Certificate=({data,selectedProgram})=>{
                   position:'absolute',
                   right:0,
                   left:50,
-                }]}>{data?.agentName || data?.addedByName}</Text>
+                }]}>{data?.agentName + " " || data?.addedByName + " "}</Text>
               </View>
         
             </View>

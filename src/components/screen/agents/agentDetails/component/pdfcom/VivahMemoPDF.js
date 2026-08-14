@@ -286,7 +286,8 @@ const buildRowName = (row = {}) => {
 };
 
 // ─── Single Receipt Page ───────────────────────────────────────────────────
-const ReceiptPage = ({ receiptData, pageData,programInfo }) => {
+const ReceiptPage = ({ receiptData, pageData, programInfo, paymentStatus = 'pending' }) => {
+  const isPaid = paymentStatus === 'paid';
   const {
     receiptNo, date, memberNo, mobile, memberName,
     address, kist, district,state,
@@ -313,9 +314,11 @@ const ReceiptPage = ({ receiptData, pageData,programInfo }) => {
          <Image style={styles.headerImg} src={TrsutData.headerImg} />
           </View>
 
-          {/* ── Title ── */}
+          {/* ── Title ── (pending keeps the plain reference wording; paid is tagged) */}
           <View style={styles.titleBox}>
-            <Text style={styles.titleText}>{(programInfo && programInfo.hiname) || 'विवाह'} मेमो</Text>
+            <Text style={styles.titleText}>
+              {(programInfo && programInfo.hiname) || 'विवाह'} मेमो{isPaid ? ' (भुगतान)' : ''}
+            </Text>
           </View>
 
           {/* ── Meta Info ── */}
@@ -543,7 +546,17 @@ const ReceiptPage = ({ receiptData, pageData,programInfo }) => {
  *   ...
  * ]
  */
-const VivahMemoPDF = ({ receiptData = {}, pages = [], members, agentInfo, programInfo, TrustData }) => {
+const VivahMemoPDF = ({
+  receiptData = {},
+  pages = [],
+  members,
+  agentInfo,
+  programInfo,
+  TrustData,
+  paymentStatus = 'pending',   // 'pending' | 'paid'
+}) => {
+  const wantedStatus = paymentStatus === 'paid' ? 'paid' : 'pending';
+
   // ── Empty state ──
   const emptyDoc = (
     <Document>
@@ -551,7 +564,11 @@ const VivahMemoPDF = ({ receiptData = {}, pages = [], members, agentInfo, progra
         <View style={styles.outerBorder}>
           <View style={styles.innerBorder}>
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <Text style={{ fontSize: 12, color: '#888' }}>कोई डेटा उपलब्ध नहीं है</Text>
+              <Text style={{ fontSize: 12, color: '#888' }}>
+                {wantedStatus === 'paid'
+                  ? 'कोई भुगतान की गई रसीद उपलब्ध नहीं है'
+                  : 'कोई बकाया रसीद उपलब्ध नहीं है'}
+              </Text>
             </View>
           </View>
         </View>
@@ -571,11 +588,14 @@ const VivahMemoPDF = ({ receiptData = {}, pages = [], members, agentInfo, progra
     const allPages = [];
 
     members.forEach((member, mIdx) => {
-      const marriages = member.marriages || [];
-      const pendingAmount = marriages
-        .filter(m => m.status === 'pending')
-        .reduce((sum, m) => sum + (parseFloat(m.amount) || 0), 0);
+      // Only the entries matching the requested status appear on this receipt.
+      // A member with nothing in that bucket is skipped entirely — so a fully
+      // paid member never shows up on a pending receipt, and vice-versa.
+      const marriages = (member.marriages || []).filter(m => m.status === wantedStatus);
       if (marriages.length === 0) return;
+
+      const totalAmount = marriages
+        .reduce((sum, m) => sum + (parseFloat(m.amount) || 0), 0);
       const memberReceiptData = {
         receiptNo: member.registrationNumber || `MEM-${mIdx + 1}`,
         date: currentDate,
@@ -631,10 +651,11 @@ const VivahMemoPDF = ({ receiptData = {}, pages = [], members, agentInfo, progra
             receiptData={memberReceiptData}
             pageData={{
               pageNum: `${chunkIdx + 1}/${totalPages}`,
-              amount: formatCurrency(pendingAmount),
+              amount: formatCurrency(totalAmount),
               rows,
             }}
             programInfo={programInfo}
+            paymentStatus={wantedStatus}
           />
         );
       });
@@ -662,6 +683,7 @@ const VivahMemoPDF = ({ receiptData = {}, pages = [], members, agentInfo, progra
           receiptData={receiptData}
           pageData={pageData}
           programInfo={programInfo}
+          paymentStatus={wantedStatus}
         />
       ))}
     </Document>
