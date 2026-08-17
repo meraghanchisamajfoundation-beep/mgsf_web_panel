@@ -275,6 +275,14 @@ const Emblem = ({ logoSrc }) => (
     )
 );
 
+// ─── रसीद न. formatter ─────────────────────────────────────────────────────
+// Serial is zero-padded to 4 digits so receipts sort and read consistently
+// (0001, 0002 … 0142). An optional prefix can namespace a batch, e.g. "MG/0001".
+const formatReceiptNo = (seq, prefix = '') => {
+  const padded = String(seq).padStart(4, '0');
+  return prefix ? `${prefix}${padded}` : padded;
+};
+
 // ─── Name cell builder ─────────────────────────────────────────────────────
 // Reference format: "सुरेश जी /मोहन लाल जी कोरना राजस्थान (सीता देवी)"
 //                    name    /father        village state   (guardian)
@@ -490,8 +498,8 @@ const ReceiptPage = ({ receiptData, pageData, programInfo, paymentStatus = 'pend
 
           {/* ── Page Number ── */}
           <View style={styles.pageNumRow}>
-            <Text style={styles.pageNumText}>Receipt : {pageData.pageNum}</Text>
-            <Text style={styles.pageNumText}> </Text>
+            <Text style={styles.pageNumText}>रसीद न. {receiptNo}</Text>
+            <Text style={styles.pageNumText}>पृष्ठ {pageData.pageNum}</Text>
           </View>
           </View>
 
@@ -555,6 +563,8 @@ const VivahMemoPDF = ({
   programInfo,
   TrustData,
   paymentStatus = 'pending',   // 'pending' | 'paid'
+  receiptStartNo = 1,          // रसीद न. counter start (continue a receipt book)
+  receiptPrefix = '',          // optional prefix, e.g. "MG/" → "MG/0001"
 }) => {
   const wantedStatus = paymentStatus === 'paid' ? 'paid' : 'pending';
 
@@ -588,6 +598,12 @@ const VivahMemoPDF = ({
     };
     const allPages = [];
 
+    // ── रसीद न. — running serial across this document ──
+    // One number per member (not per page): a member whose rows spill onto a
+    // second page keeps the same रसीद न. and just shows पृष्ठ 2/2.
+    // `receiptStartNo` lets a run continue from a physical receipt book.
+    let receiptSeq = Number(receiptStartNo) > 0 ? Math.floor(Number(receiptStartNo)) : 1;
+
     members.forEach((member, mIdx) => {
       // Only the entries matching the requested status appear on this receipt.
       // A member with nothing in that bucket is skipped entirely — so a fully
@@ -595,10 +611,14 @@ const VivahMemoPDF = ({
       const marriages = (member.marriages || []).filter(m => m.status === wantedStatus);
       if (marriages.length === 0) return;
 
+      // Serial is assigned only to members that actually get a receipt, so the
+      // numbering has no gaps.
+      const receiptNo = formatReceiptNo(receiptSeq++, receiptPrefix);
+
       const totalAmount = marriages
         .reduce((sum, m) => sum + (parseFloat(m.amount) || 0), 0);
       const memberReceiptData = {
-        receiptNo: member.registrationNumber || `MEM-${mIdx + 1}`,
+        receiptNo,
         date: currentDate,
         memberNo: member.registrationNumber || 'N/A',
         registrationNumber: member.registrationNumber || 'N/A',

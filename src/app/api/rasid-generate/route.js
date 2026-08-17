@@ -27,6 +27,8 @@ export async function POST(req) {
       filters,
       TrustData,
       paymentStatus = "pending", // 'pending' | 'paid'
+      receiptStartNo = 1,        // रसीद न. serial start
+      receiptPrefix = "",        // optional रसीद न. prefix
     } = await req.json();
 
     const status = paymentStatus === "paid" ? "paid" : "pending";
@@ -38,6 +40,8 @@ export async function POST(req) {
         programInfo={programInfo}
         TrustData={TrustData}
         paymentStatus={status}
+        receiptStartNo={receiptStartNo}
+        receiptPrefix={receiptPrefix}
       />
     );
 

@@ -6,7 +6,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   Table, Card, Row, Col, Statistic, Tag, Button, Avatar, Space,
   Input, Select, Tooltip, Badge, Modal, message, Drawer, Checkbox,
-  Divider, Radio, Spin, Progress, Empty, Dropdown,
+  Divider, Radio, Spin, Progress, Empty, Dropdown, InputNumber,
 } from 'antd';
 import {
   EyeOutlined, DownloadOutlined, ReloadOutlined, MoneyCollectOutlined,
@@ -61,6 +61,10 @@ const { generatePdf } = usePdfGenerator();
   const [activeFilters, setActiveFilters] = useState({
     search: false, status: false, group: false,
   });
+
+  // रसीद न. serial — receipts are numbered 0001, 0002 … in the generated PDF.
+  // Change this to continue from where a previous batch/receipt book ended.
+  const [receiptStartNo, setReceiptStartNo] = useState(1);
 
   // ─── Ref to hold the latest groupId without causing effect re-runs ───
   // This lets loadAgentPaymentData always read the current groupId
@@ -358,6 +362,7 @@ const { generatePdf } = usePdfGenerator();
           filters: activeFilters,
           TrustData: trustData,
           paymentStatus: status,
+          receiptStartNo,
         },
       });
     },
@@ -370,6 +375,7 @@ const { generatePdf } = usePdfGenerator();
       summary,
       activeFilters,
       trustData,
+      receiptStartNo,
     ]
   );
 
@@ -403,10 +409,11 @@ const { generatePdf } = usePdfGenerator();
           filters: activeFilters,
           TrustData: trustData,
           paymentStatus: status,
+          receiptStartNo,
         },
       });
     },
-    [generatePdf, summary, agentInfo, selectedProgram, activeFilters, trustData]
+    [generatePdf, summary, agentInfo, selectedProgram, activeFilters, trustData, receiptStartNo]
   );
 
   const receiptMenuItems = useMemo(
@@ -642,6 +649,17 @@ const { generatePdf } = usePdfGenerator();
             {programList.map((p) => <Option key={p.id} value={p.id}>{p.name}</Option>)}
           </Select>
           <Button icon={<ReloadOutlined />} onClick={loadAgentPaymentData} loading={loading}>Refresh</Button>
+          <Tooltip title="रसीद न. इस नंबर से शुरू होगा (0001, 0002 …)">
+            <InputNumber
+              min={1}
+              step={1}
+              precision={0}
+              value={receiptStartNo}
+              onChange={(v) => setReceiptStartNo(v || 1)}
+              addonBefore="रसीद न."
+              style={{ width: 150 }}
+            />
+          </Tooltip>
           <Dropdown
             menu={{
               items: receiptMenuItems,
