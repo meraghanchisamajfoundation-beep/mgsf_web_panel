@@ -727,6 +727,27 @@ const GenerateRasidEntry = ({ open, setOpen, selectedProgram, user, closingMembe
         ? closingMemberList.filter(m => selectedGroupIds.includes(m.closingGroupId))
         : closingMemberList
 
+    /* ── Bulk select helpers ──────────────────────────────────────────────
+     * "Select all" respects the closing-group filter above, so it selects
+     * exactly what is visible in the dropdown, not the whole database.
+     */
+    const allClosingSelected =
+        filteredClosingMembers.length > 0 &&
+        filteredClosingMembers.every(m => selectedClosingMembers.includes(m.id))
+
+    const selectAllClosingMembers = () =>
+        setSelectedClosingMembers(filteredClosingMembers.map(m => m.id))
+
+    // Payers: skip members that would be skipped anyway (blocked / inactive)
+    const selectableMembers = allMembersData.filter(
+        m => m.status !== 'blocked' && m.active_flag !== false
+    )
+    const allMembersSelected =
+        selectableMembers.length > 0 &&
+        selectableMembers.every(m => selectedMembers.includes(m.id))
+
+    const selectAllMembers = () => setSelectedMembers(selectableMembers.map(m => m.id))
+
     /* filter function for closing member search */
     const filterClosingMember = (input, option) => {
         const m = closingMemberList.find(m => m.id === option.value)
@@ -1165,9 +1186,20 @@ const GenerateRasidEntry = ({ open, setOpen, selectedProgram, user, closingMembe
                 {/* ── Closing members select ── */}
                 <div style={styles.sectionHeader}>
                     <div style={styles.sectionLabel}>Closing members (marriage cases)</div>
-                    {selectedClosingMembers.length > 0 && (
-                        <span style={styles.countPill}>{selectedClosingMembers.length} selected</span>
-                    )}
+                    <Space size={6}>
+                        <Button
+                            size="small"
+                            type="link"
+                            style={{ padding: 0, fontSize: 12 }}
+                            disabled={isBusy || allClosingSelected || filteredClosingMembers.length === 0}
+                            onClick={selectAllClosingMembers}
+                        >
+                            Select all ({filteredClosingMembers.length})
+                        </Button>
+                        {selectedClosingMembers.length > 0 && (
+                            <span style={styles.countPill}>{selectedClosingMembers.length} selected</span>
+                        )}
+                    </Space>
                 </div>
                 <Select
                     style={{ width: '100%', marginBottom: 16 }}
@@ -1184,13 +1216,26 @@ const GenerateRasidEntry = ({ open, setOpen, selectedProgram, user, closingMembe
                     dropdownRender={(menu) => (
                         <>
                             {menu}
-                            {selectedClosingMembers.length > 0 && (
-                                <div style={{ padding: '6px 12px', borderTop: '0.5px solid #f0f0f0' }}>
-                                    <Button type="link" size="small" onClick={() => setSelectedClosingMembers([])} style={{ padding: 0 }}>
+                            <div style={{
+                                display: 'flex', gap: 14, padding: '6px 12px',
+                                borderTop: '0.5px solid #f0f0f0',
+                            }}>
+                                <Button
+                                    type="link"
+                                    size="small"
+                                    style={{ padding: 0 }}
+                                    disabled={allClosingSelected || filteredClosingMembers.length === 0}
+                                    onClick={selectAllClosingMembers}
+                                >
+                                    Select all ({filteredClosingMembers.length})
+                                </Button>
+                                {selectedClosingMembers.length > 0 && (
+                                    <Button type="link" size="small" style={{ padding: 0 }}
+                                        onClick={() => setSelectedClosingMembers([])}>
                                         Clear all
                                     </Button>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </>
                     )}
                 >
@@ -1308,9 +1353,20 @@ const GenerateRasidEntry = ({ open, setOpen, selectedProgram, user, closingMembe
                             ? 'Members (only needed for the "selected members" scope)'
                             : 'Members to generate payments for'}
                     </div>
-                    {selectedMembers.length > 0 && (
-                        <span style={styles.countPill}>{selectedMembers.length} selected</span>
-                    )}
+                    <Space size={6}>
+                        <Button
+                            size="small"
+                            type="link"
+                            style={{ padding: 0, fontSize: 12 }}
+                            disabled={isBusy || allMembersSelected || selectableMembers.length === 0}
+                            onClick={selectAllMembers}
+                        >
+                            Select all ({selectableMembers.length})
+                        </Button>
+                        {selectedMembers.length > 0 && (
+                            <span style={styles.countPill}>{selectedMembers.length} selected</span>
+                        )}
+                    </Space>
                 </div>
                 <Select
                     style={{ width: '100%', marginBottom: 4 }}
@@ -1324,6 +1380,31 @@ const GenerateRasidEntry = ({ open, setOpen, selectedProgram, user, closingMembe
                     maxTagCount="responsive"
                     maxTagPlaceholder={(omitted) => `+${omitted.length} more`}
                     notFoundContent="No members found"
+                    dropdownRender={(menu) => (
+                        <>
+                            {menu}
+                            <div style={{
+                                display: 'flex', gap: 14, padding: '6px 12px',
+                                borderTop: '0.5px solid #f0f0f0',
+                            }}>
+                                <Button
+                                    type="link"
+                                    size="small"
+                                    style={{ padding: 0 }}
+                                    disabled={allMembersSelected || selectableMembers.length === 0}
+                                    onClick={selectAllMembers}
+                                >
+                                    Select all ({selectableMembers.length})
+                                </Button>
+                                {selectedMembers.length > 0 && (
+                                    <Button type="link" size="small" style={{ padding: 0 }}
+                                        onClick={() => setSelectedMembers([])}>
+                                        Clear all
+                                    </Button>
+                                )}
+                            </div>
+                        </>
+                    )}
                 >
                     {allMembersData.map((member) => {
                         let paymentCount = 0
