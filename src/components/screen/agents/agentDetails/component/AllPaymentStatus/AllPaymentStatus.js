@@ -13,8 +13,11 @@ import {
 } from 'ag-grid-community';
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import AllPaymentPdf from './AllPaymentPdf';
-import { Badge, Button, Drawer, Select, Space, Spin, message } from 'antd';
-import { DownloadOutlined, FolderOpenOutlined, TeamOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Badge, Button, Drawer, Dropdown, Segmented, Select, Space, Spin, message } from 'antd';
+import {
+  DownloadOutlined, FolderOpenOutlined, TeamOutlined, ReloadOutlined,
+  FilePdfOutlined, ClockCircleOutlined, CheckCircleOutlined, UnorderedListOutlined,
+} from '@ant-design/icons';
 import dayjs from 'dayjs';
 
 ModuleRegistry.registerModules([
@@ -32,6 +35,7 @@ const StatusRenderer = ({ value }) => {
     paid: { label: 'Paid', bg: '#dcfce7', color: '#166534' },
     pending: { label: 'Pending', bg: '#fef9c3', color: '#854d0e' },
     both: { label: 'Both', bg: '#dbeafe', color: '#1e40af' },
+    none: { label: 'No Payment', bg: '#f1f5f9', color: '#64748b' },
   };
   const s = map[value] || {};
   return (
@@ -60,6 +64,24 @@ const COL_DEFS = [
   { headerName: 'Status', field: 'status', width: 100, cellRenderer: StatusRenderer },
   { headerName: 'Pending #', field: 'pendingCount', width: 105, type: 'numericColumn', cellStyle: { background: '#fef3c7', fontWeight: 600 } },
   { headerName: 'Paid #', field: 'paidCount', width: 95, type: 'numericColumn', cellStyle: { background: '#dcfce7', fontWeight: 600 } },
+];
+
+// Columns for the "Closed Members" view — the agent's own members whose closing
+// has already happened. Amounts here are what was COLLECTED FOR them by others,
+// which is the opposite direction to the main payments grid.
+const CLOSED_COL_DEFS = [
+  { headerName: '#', field: 'index', width: 60, pinned: 'left', cellStyle: { fontWeight: 700, color: '#6b7280' } },
+  { headerName: 'Reg. No.', field: 'registrationNumber', width: 110, pinned: 'left', cellStyle: { fontWeight: 700 } },
+  { headerName: 'Member Name', field: 'memberName', minWidth: 170, cellStyle: { fontWeight: 600 } },
+  { headerName: 'Father Name', field: 'fatherName', minWidth: 140 },
+  { headerName: 'Phone', field: 'phone', width: 130 },
+  { headerName: 'Village', field: 'village', minWidth: 120 },
+  { headerName: 'Closing Date', field: 'closingDate', width: 130, cellStyle: { fontWeight: 700, color: '#7c3aed' } },
+  { headerName: 'Closing Group', field: 'closingGroupName', minWidth: 150, cellStyle: { color: '#0369a1' } },
+  { headerName: 'Collected (₹)', field: 'collectedForMember', width: 135, cellRenderer: CurrencyRenderer, type: 'numericColumn', cellStyle: { fontWeight: 700, color: '#059669' } },
+  { headerName: 'Due (₹)', field: 'dueForMember', width: 120, cellRenderer: CurrencyRenderer, type: 'numericColumn', cellStyle: { fontWeight: 700, color: '#dc2626' } },
+  { headerName: 'Paid #', field: 'contributorsPaid', width: 95, type: 'numericColumn', cellStyle: { background: '#dcfce7', fontWeight: 600 } },
+  { headerName: 'Pending #', field: 'contributorsPending', width: 105, type: 'numericColumn', cellStyle: { background: '#fef3c7', fontWeight: 600 } },
 ];
 
 const DEFAULT_COL = { sortable: true, filter: true, resizable: true, flex: 1, minWidth: 100 };
@@ -129,6 +151,9 @@ const AllPaymentStatus = ({ agentId, agentInfo }) => {
   const [closingGroups, setClosingGroups] = useState([]);
   const [selectedGroupId, setSelectedGroupId] = useState(null);
   const [rowData, setRowData] = useState([]);
+  const [closedRows, setClosedRows] = useState([]);
+  // 'payments' = normal grid · 'closed' = agent's own members who are closed
+  const [view, setView] = useState('payments');
   const [isLoading, setIsLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState(null);
@@ -147,6 +172,7 @@ const [pdfLoading, setPdfLoading] = useState(false);
       fetchPaymentData(selectedProgramId, selectedGroupId);
     } else {
       setRowData([]);
+      setClosedRows([]);
       setClosingGroups([]);
     }
   }, [selectedProgramId, selectedGroupId, user?.uid]);
@@ -164,8 +190,9 @@ const [pdfLoading, setPdfLoading] = useState(false);
       });
       
       setRowData(data.rows || []);
+      setClosedRows(data.closedRows || []);
       setClosingGroups(data.closingGroups || []);
-      
+
       if (data.rows?.length === 0) {
         message.info('No payment records found');
       }
@@ -173,6 +200,7 @@ const [pdfLoading, setPdfLoading] = useState(false);
       console.error('[AllPaymentStatus]', err);
       setError(err.message);
       setRowData([]);
+      setClosedRows([]);
       message.error(err.message);
     } finally {
       setIsLoading(false);
@@ -205,35 +233,91 @@ const [pdfLoading, setPdfLoading] = useState(false);
     return `${name}_Payment_${dayjs().format('DDMMYYYY')}.pdf`;
   };
 
-const generatePdf = async () => {
-  setPdfLoading(true);
-  try {
-    const { getAuth } = await import('firebase/auth');
-    const token = await getAuth().currentUser?.getIdToken();
- 
-    const response = await fetch('/api/all-payment-pdf', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({ rowData, agentInfo }),
-    });
- 
-    if (!response.ok) throw new Error('Failed to generate PDF');
- 
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    window.open(url, '_blank');
- 
-    message.success('PDF downloaded successfully!');
-  } catch (err) {
-    console.error('PDF generation error:', err);
-    message.error('Failed to generate PDF. Please try again.');
-  } finally {
-    setPdfLoading(false);
-  }
-};
+  // ── PDF filtering ────────────────────────────────────────────────────────
+  // 'all'     → every active member (including members with no closing payment)
+  // 'pending' → only members who still owe something
+  // 'paid'    → only members who have paid something
+  const filterRowsForPdf = useCallback(
+    (mode) => {
+      if (mode === 'pending') return rowData.filter((r) => (r.pendingCount || 0) > 0);
+      if (mode === 'paid')    return rowData.filter((r) => (r.paidCount    || 0) > 0);
+      return rowData;
+    },
+    [rowData]
+  );
+
+  const generatePdf = useCallback(async (mode = 'all') => {
+    const source = mode === 'closed' ? closedRows : filterRowsForPdf(mode);
+    const rows = source.map((r, i) => ({ ...r, index: i + 1 }));
+
+    if (rows.length === 0) {
+      message.warning(
+        mode === 'paid'
+          ? 'No member has any paid payment.'
+          : mode === 'pending'
+            ? 'No member has any pending payment.'
+            : mode === 'closed'
+              ? 'No closed member for this agent.'
+              : 'No records to export.'
+      );
+      return;
+    }
+
+    setPdfLoading(true);
+    try {
+      const { getAuth } = await import('firebase/auth');
+      const token = await getAuth().currentUser?.getIdToken();
+
+      const response = await fetch('/api/all-payment-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ rowData: rows, agentInfo, paymentStatus: mode }),
+      });
+
+      if (!response.ok) throw new Error('Failed to generate PDF');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+
+      message.success(`PDF ready — ${rows.length} member(s)`);
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      message.error('Failed to generate PDF. Please try again.');
+    } finally {
+      setPdfLoading(false);
+    }
+  }, [filterRowsForPdf, closedRows, agentInfo]);
+
+  const pdfMenuItems = [
+    {
+      key: 'all',
+      label: `All Members (${filterRowsForPdf('all').length})`,
+      icon: <UnorderedListOutlined />,
+    },
+    {
+      key: 'pending',
+      label: `Only Pending (${filterRowsForPdf('pending').length})`,
+      icon: <ClockCircleOutlined />,
+      disabled: filterRowsForPdf('pending').length === 0,
+    },
+    {
+      key: 'paid',
+      label: `Only Paid (${filterRowsForPdf('paid').length})`,
+      icon: <CheckCircleOutlined />,
+      disabled: filterRowsForPdf('paid').length === 0,
+    },
+    { type: 'divider' },
+    {
+      key: 'closed',
+      label: `Closed Members (${closedRows.length})`,
+      icon: <TeamOutlined />,
+      disabled: closedRows.length === 0,
+    },
+  ];
   return (
     <div style={{ padding: '20px 24px', background: '#f8fafc', minHeight: '100vh' }}>
 
@@ -322,16 +406,20 @@ const generatePdf = async () => {
             CSV
           </Button>
           
- <Button
-  icon={<DownloadOutlined />}
-  onClick={generatePdf}
-  loading={pdfLoading}          // ← Ant Design loading spinner built-in
-  disabled={!rowData.length}
-  size="large"
-  style={{ background: '#4f46e5', color: '#fff', border: 'none' }}
->
-  {pdfLoading ? 'Generating...' : 'PDF'}
-</Button>
+          <Dropdown
+            menu={{ items: pdfMenuItems, onClick: ({ key }) => generatePdf(key) }}
+            disabled={!rowData.length || pdfLoading}
+          >
+            <Button
+              icon={<FilePdfOutlined />}
+              loading={pdfLoading}
+              disabled={!rowData.length}
+              size="large"
+              style={{ background: '#4f46e5', color: '#fff', border: 'none' }}
+            >
+              {pdfLoading ? 'Generating...' : 'PDF'}
+            </Button>
+          </Dropdown>
         </div>
       </div>
 
@@ -360,6 +448,7 @@ const generatePdf = async () => {
           <SummaryCard label="Paid Count" value={totals.paidCnt} color="#059669" sub="payments" />
           <SummaryCard label="Pending Count" value={totals.pendCnt} color="#f59e0b" sub="payments" />
           <SummaryCard label="Members" value={uniqueMembers} color="#4f46e5" />
+          <SummaryCard label="Closed Members" value={closedRows.length} color="#7c3aed" sub="समापन हो चुका" />
           {selectedGroup && (
             <SummaryCard label="Closing Group" value={selectedGroup.name} color="#0369a1" sub="group filter active" />
           )}
@@ -384,25 +473,62 @@ const generatePdf = async () => {
         </div>
       )}
 
+      {/* View switch — payments vs the agent's own closed members */}
+      {!isLoading && selectedProgramId && rowData.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <Segmented
+            value={view}
+            onChange={setView}
+            size="large"
+            options={[
+              {
+                value: 'payments',
+                label: (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <UnorderedListOutlined /> Payments ({rowData.length})
+                  </span>
+                ),
+              },
+              {
+                value: 'closed',
+                disabled: closedRows.length === 0,
+                label: (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <TeamOutlined /> Closed Members ({closedRows.length})
+                  </span>
+                ),
+              },
+            ]}
+          />
+          {view === 'closed' && (
+            <span style={{ marginLeft: 12, fontSize: 12, color: '#94a3b8' }}>
+              इस एजेंट के वो सदस्य जिनका समापन हो चुका है — राशि उनके लिए इकट्ठा हुई है
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Grid */}
       {!isLoading && selectedProgramId && rowData.length > 0 && (
         <div className="ag-theme-alpine" style={{
-          height: 'calc(100vh - 280px)', borderRadius: 12, overflow: 'hidden',
+          height: 'calc(100vh - 340px)', borderRadius: 12, overflow: 'hidden',
           boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-          border: selectedGroupId ? '2px solid #93c5fd' : '1px solid #e2e8f0'
+          border: view === 'closed'
+            ? '2px solid #ddd6fe'
+            : selectedGroupId ? '2px solid #93c5fd' : '1px solid #e2e8f0'
         }}>
           <AgGridReact
             ref={gridRef}
-            rowData={rowData}
+            rowData={view === 'closed' ? closedRows : rowData}
             defaultColDef={DEFAULT_COL}
-            columnDefs={COL_DEFS}
+            columnDefs={view === 'closed' ? CLOSED_COL_DEFS : COL_DEFS}
             pagination
             paginationPageSize={50}
             paginationPageSizeSelector={[20, 50, 100, 200]}
             enableCellTextSelection
             ensureDomOrder
             animateRows
-            overlayNoRowsTemplate='<span style="font-size:14px;color:#6b7280">No payment records found</span>'
+            overlayNoRowsTemplate='<span style="font-size:14px;color:#6b7280">No records found</span>'
           />
         </div>
       )}

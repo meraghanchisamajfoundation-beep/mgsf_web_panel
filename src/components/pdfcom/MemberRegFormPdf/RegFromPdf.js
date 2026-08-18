@@ -398,7 +398,7 @@ const RegFormPdf = ({data, selectedProgram}) => {
                   <Text style={styles.label}>नाम:</Text>
                   <Text style={[styles.value,{
                     width:"80%"
-                  }]}>{data.displayName}</Text>
+                  }]}>{data.displayName + " "}</Text>
                 </View>
               </View>
 
@@ -406,7 +406,7 @@ const RegFormPdf = ({data, selectedProgram}) => {
               <View style={styles.fullRow}>
                 <View style={styles.field}>
                   <Text style={styles.label}>पिता/पति का नाम:</Text>
-                  <Text style={styles.value}>{data.fatherName}</Text>
+                  <Text style={styles.value}>{data.fatherName + " "}</Text>
                 </View>
               </View>
 
@@ -414,7 +414,7 @@ const RegFormPdf = ({data, selectedProgram}) => {
               <View style={styles.fullRow}>
                 <View style={styles.field}>
                   <Text style={styles.label}>गोत्र:</Text>
-                  <Text style={styles.value}>{data.gotra}</Text>
+                  <Text style={styles.value}>{data.gotra + " "}</Text>
                 </View>
               </View>
 
@@ -449,7 +449,7 @@ const RegFormPdf = ({data, selectedProgram}) => {
               <View style={[styles.fullRow,{width:'100%'}]}>
                 <View style={styles.field}>
                   <Text style={styles.label}>गाँव/शहर का नाम:</Text>
-                  <Text style={styles.value}>{data.village}</Text>
+                  <Text style={styles.value}>{data.village + " "}</Text>
                 </View>
               </View>
 
@@ -457,11 +457,11 @@ const RegFormPdf = ({data, selectedProgram}) => {
               <View style={[styles.twoColumnRow,{width:'100%'}]}>
                 <View style={styles.halfField}>
                   <Text style={styles.label}>जिला:</Text>
-                  <Text style={styles.value}>{data.district}</Text>
+                  <Text style={styles.value}>{data.district + " "}</Text>
                 </View>
                 <View style={styles.halfField}>
                   <Text style={styles.label}>राज्य:</Text>
-                  <Text style={styles.value}>{data.state}</Text>
+                  <Text style={styles.value}>{data.state + " "}</Text>
                 </View>
               </View>
 
@@ -469,11 +469,11 @@ const RegFormPdf = ({data, selectedProgram}) => {
               <View style={[styles.twoColumnRow,{width:'100%'}]}>
                 <View style={[styles.halfField, { width: '60%' }]}>
                   <Text style={styles.label}>वारिसदार का नाम:</Text>
-                  <Text style={styles.value}>{data.guardian}</Text>
+                  <Text style={styles.value}>{data.guardian + " "}</Text>
                 </View>
                 <View style={[styles.halfField, { width: '38%', marginRight: 0 }]}>
                   <Text style={styles.label}>संबंध:</Text>
-                  <Text style={styles.value}>{data.guardianRelation}</Text>
+                  <Text style={styles.value}>{data.guardianRelation + " "}</Text>
                 </View>
               </View>
 
@@ -525,14 +525,14 @@ const RegFormPdf = ({data, selectedProgram}) => {
               {/* Agent */}
               <View style={styles.footerBox}>
                 <Text style={styles.footerValue}>
-                  {data.addedByName} ({data.agentPhone})
+                  {data.addedByName + " "} ({data.agentPhone})
                 </Text>
                 <Text style={styles.footerLabel}>कार्यकर्ता</Text>
               </View>
 
               {/* Organization */}
               <View style={styles.footerBox}>
-                <Text style={styles.footerValue}>{TrsutData.trustPresident}</Text>
+                <Text style={styles.footerValue}>{TrsutData.trustPresident + " "}</Text>
                 <Text style={styles.footerLabel}>संस्थापक</Text>
               </View>
             </View>

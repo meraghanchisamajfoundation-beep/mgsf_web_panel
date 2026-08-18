@@ -1,5 +1,5 @@
 'use client'
-import React, { use, useState } from 'react';
+import React, { use, useEffect, useMemo, useState } from 'react';
 import { 
     Drawer, 
     Table, 
@@ -14,7 +14,9 @@ import {
     Badge,
     Button,
     Divider,
-    Tooltip
+    Tooltip,
+    Select,
+    Empty
 } from 'antd';
 import { 
     DollarOutlined, 
@@ -23,8 +25,13 @@ import {
     CalendarOutlined,
     CreditCardOutlined,
     WalletOutlined,
-    DownloadOutlined
+    DownloadOutlined,
+    TeamOutlined,
+    FolderOpenOutlined
 } from '@ant-design/icons';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { useAuth } from '@/lib/AuthProvider';
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import SingleMemberPendingPaymentPdf from './PendingPaymentPdf';
 import { useSelector } from 'react-redux';
@@ -41,6 +48,35 @@ function MemberPaymentDetails({ visible, onClose, memberData, paymentReport, loa
     // Which receipt is being previewed/downloaded: 'pending' | 'paid'
     const [pdfStatus, setPdfStatus] = useState('pending');
 
+    // Closing group filter — null means "all groups"
+    const [closingGroups, setClosingGroups] = useState([]);
+    const [groupFilter, setGroupFilter] = useState(null);
+    const { user } = useAuth();
+
+    // Group id → name, so payments (which only store the id) can be labelled
+    useEffect(() => {
+        const load = async () => {
+            if (!visible || !user?.uid || !selectedProgram?.id) return;
+            try {
+                const snap = await getDocs(collection(
+                    db, `users/${user.uid}/programs/${selectedProgram.id}/closing_groups`
+                ));
+                setClosingGroups(snap.docs.map(d => ({ id: d.id, name: d.data().name })));
+            } catch (e) {
+                console.error('Failed to load closing groups', e);
+            }
+        };
+        load();
+    }, [visible, user?.uid, selectedProgram?.id]);
+
+    // Reset the filter each time the drawer opens for a different member
+    useEffect(() => { if (visible) setGroupFilter(null); }, [visible, memberData?.memberId]);
+
+    const groupNameById = useMemo(
+        () => new Map(closingGroups.map(g => [g.id, g.name])),
+        [closingGroups]
+    );
+
     const handleDownloadPDF = (status) => {
         setPdfStatus(status);
         setPdfPreviewOpen(true);
@@ -50,11 +86,44 @@ function MemberPaymentDetails({ visible, onClose, memberData, paymentReport, loa
     const { report, summary } = paymentReport;
     const member = memberData;
 
+    const allMarriages = report.marriages || [];
+
+    // Only groups this member actually has payments in — no empty options
+    const availableGroups = Array.from(
+        new Set(allMarriages.map(m => m.closingGroupId).filter(Boolean))
+    ).map(id => ({
+        id,
+        name: groupNameById.get(id) || 'Unnamed group',
+        count: allMarriages.filter(m => m.closingGroupId === id).length,
+    }));
+
+    const ungroupedCount = allMarriages.filter(m => !m.closingGroupId).length;
+
+    const marriages = groupFilter === null
+        ? allMarriages
+        : groupFilter === '__none__'
+            ? allMarriages.filter(m => !m.closingGroupId)
+            : allMarriages.filter(m => m.closingGroupId === groupFilter);
+
     // Counts per bucket — used to disable a receipt option when there is
     // nothing to print (a fully paid member has no pending receipt).
-    const pendingCount = (report.marriages || []).filter(m => m.status === 'pending').length;
-    const paidCount    = (report.marriages || []).filter(m => m.status === 'paid').length;
+    const pendingCount = marriages.filter(m => m.status === 'pending').length;
+    const paidCount    = marriages.filter(m => m.status === 'paid').length;
     const isPaidPdf    = pdfStatus === 'paid';
+
+    const activeGroupName = groupFilter === null
+        ? null
+        : groupFilter === '__none__'
+            ? 'No group'
+            : (groupNameById.get(groupFilter) || 'Unnamed group');
+
+    // The PDF receives the already-filtered list so it matches what is on screen
+    const filteredReport = {
+        ...paymentReport,
+        report: { ...report, marriages },
+    };
+
+    const filteredTotal = marriages.reduce((s, m) => s + (parseFloat(m.amount) || 0), 0);
 
     // Format currency
     const formatCurrency = (amount) => {
@@ -131,7 +200,8 @@ function MemberPaymentDetails({ visible, onClose, memberData, paymentReport, loa
     const namePart = member.displayName.replace(/\s+/g, '_');
     const datePart = dayjs().format('YYYYMMDD_HHmmss');
     const kindPart = isPaidPdf ? 'Paid' : 'Pending';
-    return `${kindPart}_Receipt_${namePart}_${datePart}.pdf`;
+    const groupPart = activeGroupName ? `_${activeGroupName.replace(/\s+/g, '_')}` : '';
+    return `${kindPart}_Receipt_${namePart}${groupPart}_${datePart}.pdf`;
   }
     return (
         <Drawer
@@ -222,38 +292,82 @@ function MemberPaymentDetails({ visible, onClose, memberData, paymentReport, loa
           
 
             {/* Marriage Payments Table */}
-            <Card 
+            <Card
                 title={
                     <Space>
                         <CreditCardOutlined />
                         <span>Closings Payments</span>
-                        <Badge 
-                            count={report.marriages?.length || 0} 
+                        <Badge
+                            count={marriages.length}
                             style={{ backgroundColor: '#1890ff' }}
                         />
+                        {activeGroupName && (
+                            <Tag color="blue" icon={<FolderOpenOutlined />} closable
+                                onClose={(e) => { e.preventDefault(); setGroupFilter(null); }}>
+                                {activeGroupName}
+                            </Tag>
+                        )}
                     </Space>
+                }
+                extra={
+                    <Select
+                        placeholder="All closing groups"
+                        style={{ minWidth: 240 }}
+                        value={groupFilter}
+                        onChange={(v) => setGroupFilter(v ?? null)}
+                        allowClear
+                        showSearch
+                        optionFilterProp="label"
+                        suffixIcon={<TeamOutlined />}
+                        options={[
+                            ...availableGroups.map(g => ({
+                                value: g.id,
+                                label: `${g.name} (${g.count})`,
+                            })),
+                            ...(ungroupedCount > 0
+                                ? [{ value: '__none__', label: `No group (${ungroupedCount})` }]
+                                : []),
+                        ]}
+                        notFoundContent="No closing groups"
+                    />
                 }
                 className="mb-4"
             >
                 <Table
                     columns={marriageColumns}
-                    dataSource={report.marriages || []}
+                    dataSource={marriages}
                     rowKey="paymentId"
                     pagination={false}
                     size="small"
                     scroll={{ x: 'max-content' }}
+                    locale={{
+                        emptyText: (
+                            <Empty
+                                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                description={
+                                    activeGroupName
+                                        ? `No payments in "${activeGroupName}"`
+                                        : 'No payments'
+                                }
+                            />
+                        ),
+                    }}
                     summary={() => (
                         <Table.Summary fixed>
                             <Table.Summary.Row>
                                 <Table.Summary.Cell index={0} colSpan={2}>
-                                    <Text strong>Total Amount:</Text>
+                                    <Text strong>
+                                        {activeGroupName ? 'Filtered Total:' : 'Total Amount:'}
+                                    </Text>
                                 </Table.Summary.Cell>
                                 <Table.Summary.Cell index={1}>
                                     <Text strong className="text-green-600">
-                                        {formatCurrency(summary?.totalAmount || 0)}
+                                        {formatCurrency(
+                                            activeGroupName ? filteredTotal : (summary?.totalAmount || 0)
+                                        )}
                                     </Text>
                                 </Table.Summary.Cell>
-                               
+
                             </Table.Summary.Row>
                         </Table.Summary>
                     )}
@@ -278,10 +392,11 @@ function MemberPaymentDetails({ visible, onClose, memberData, paymentReport, loa
                           document={
                     <SingleMemberPendingPaymentPdf
                         memberData={member}
-                        paymentReport={paymentReport}
+                        paymentReport={filteredReport}
                         programInfo={selectedProgram}
                         TrustData={TrustData}
                         paymentStatus={pdfStatus}
+                        closingGroupName={activeGroupName}
                     />
                 }
                             fileName={getFileName()}
@@ -304,10 +419,11 @@ function MemberPaymentDetails({ visible, onClose, memberData, paymentReport, loa
                 <PDFViewer style={{ width: '100%', height: '100vh', border: 'none' }}>
                   <SingleMemberPendingPaymentPdf
             memberData={member}
-            paymentReport={paymentReport}
+            paymentReport={filteredReport}
             programInfo={selectedProgram}
             TrustData={TrustData}
             paymentStatus={pdfStatus}
+            closingGroupName={activeGroupName}
         />
                 </PDFViewer>
             </Drawer>

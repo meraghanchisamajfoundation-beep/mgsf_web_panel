@@ -25,6 +25,7 @@ import NotoSansDevanagariBold from '@/app/api/helperfile/static/font/NotoSansDev
 import { TrustData } from '@/components/screen/settings/organization';
 import { TrsutData } from '@/lib/constentData';
 import { getDistrictLabel, getStateLabel } from '@/lib/staticData';
+import { sortByDate, formatShortDate } from '@/lib/dateUtils';
 
 Font.register({
   family: 'NotoSansDevanagari',
@@ -589,9 +590,7 @@ const VivahMemoPDF = ({
 
   // ── Mode 2: Payment Report (members array) ──
   if (members && members.length > 0) {
-    const currentDate = new Date().toLocaleDateString('en-IN', {
-      day: '2-digit', month: 'short', year: 'numeric'
-    });
+    const currentDate = formatShortDate(new Date());   // 25-04-2025
     const formatCurrency = (amount) => {
       const num = parseFloat(amount || 0);
       return `₹${num.toLocaleString('hi-IN')}`;
@@ -608,7 +607,13 @@ const VivahMemoPDF = ({
       // Only the entries matching the requested status appear on this receipt.
       // A member with nothing in that bucket is skipped entirely — so a fully
       // paid member never shows up on a pending receipt, and vice-versa.
-      const marriages = (member.marriages || []).filter(m => m.status === wantedStatus);
+      // Closing list is printed in date order (oldest first). Entries with no
+      // usable date fall to the bottom instead of scattering through the list.
+      const marriages = sortByDate(
+        (member.marriages || []).filter(m => m.status === wantedStatus),
+        m => m.marriageDate,
+        'asc'
+      );
       if (marriages.length === 0) return;
 
       // Serial is assigned only to members that actually get a receipt, so the
@@ -661,7 +666,7 @@ const VivahMemoPDF = ({
           state: getStateLabel(m.closingState),
           guardian: m.closingGuardian || '',
           phone: m.closingPhone || '-',
-          date: m.marriageDate || '-',
+          date: formatShortDate(m.marriageDate, '-'),
         }));
         for (let i = rows.length; i < ROWS_PER_PAGE; i++) {
           rows.push({ sr: '', regNo: '', name: '', fatherName: '', address: '', state: '', guardian: '', phone: '', date: '' });

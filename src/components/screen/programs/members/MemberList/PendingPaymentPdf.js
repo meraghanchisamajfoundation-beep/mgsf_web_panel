@@ -15,6 +15,7 @@ import NotoSansDevanagariBold from '@/app/api/helperfile/static/font/NotoSansDev
 import { pdfColors, TrsutData } from '@/lib/constentData';
 import PdfHeaderCom from '@/components/screen/agents/agentDetails/component/pdfcom/HeaderCom';
 import { getDistrictStateLabel, getStateLabel } from '@/lib/staticData';
+import { sortByDate, formatShortDate } from '@/lib/dateUtils';
 
 Font.register({
   family: 'NotoSansDevanagari',
@@ -335,6 +336,7 @@ const SingleMemberPendingPaymentPdf = ({
   programInfo = {},
   TrustData,
   paymentStatus = 'pending',   // 'pending' | 'paid'
+  closingGroupName = null,     // set when a closing-group filter is active
 }) => {
   if (!memberData || !paymentReport) return null;
 
@@ -372,7 +374,12 @@ const SingleMemberPendingPaymentPdf = ({
   // Only the marriages matching the requested status are printed — a member
   // with nothing in that bucket gets the "nothing here" page instead.
   const allMarriages = report.marriages || [];
-  const pendingMarriages = allMarriages.filter(m => m.status === wantedStatus);
+  // Printed in date order (oldest first); undated rows go last.
+  const pendingMarriages = sortByDate(
+    allMarriages.filter(m => m.status === wantedStatus),
+    m => m.marriageDate,
+    'asc'
+  );
 
   // Summary for the selected bucket
   const pendingSummary = {
@@ -383,9 +390,7 @@ const SingleMemberPendingPaymentPdf = ({
     paidAmount: report.summary?.paidAmount || 0
   };
 
-  const currentDate = new Date().toLocaleDateString('en-IN', {
-    day: '2-digit', month: 'short', year: 'numeric'
-  });
+  const currentDate = formatShortDate(new Date());   // 25-04-2025
   const currentTime = new Date().toLocaleTimeString('en-IN', {
     hour: '2-digit', minute: '2-digit'
   });
@@ -456,7 +461,9 @@ const SingleMemberPendingPaymentPdf = ({
           <Text style={styles.address}>{TrustData.address}</Text>
           <Text style={styles.phoneNumbers}>{TrustData.contact}</Text>
           <View style={styles.schemeBox}>
-            <Text style={styles.schemeText}>{L.reportTitle}</Text>
+            <Text style={styles.schemeText}>
+              {L.reportTitle}{closingGroupName ? ` · ${closingGroupName}` : ''}
+            </Text>
           </View>
         </View>
         <Image src={TrustData.logo} style={[styles.logoImage, { width: 80 }]} />
@@ -585,7 +592,7 @@ const SingleMemberPendingPaymentPdf = ({
               <Text style={styles.textCenter}>{marriage.closingPhone || '-'}</Text>
             </View>
              <View style={[styles.tableCell, styles.colDate]}>
-              <Text style={styles.textCenter}>{marriage.marriageDate || '-'}</Text>
+              <Text style={styles.textCenter}>{formatShortDate(marriage.marriageDate, '-')}</Text>
             </View>
             <View style={[styles.tableCell, styles.colAmount, { borderRightWidth: 0 }]}>
               <Text style={[styles.textRight, { color: L.amountColor }]}>
@@ -661,7 +668,9 @@ const SingleMemberPendingPaymentPdf = ({
               {chunkIndex === 0 && renderMemberCard()}
 
               <Text style={styles.tableSectionTitle}>
-                {L.tableTitle} {chunks.length > 1 ? `(पृष्ठ ${chunkIndex + 1}/${chunks.length})` : ''}
+                {L.tableTitle}
+                {closingGroupName ? ` — समापन ग्रुप: ${closingGroupName}` : ''}
+                {chunks.length > 1 ? ` (पृष्ठ ${chunkIndex + 1}/${chunks.length})` : ''}
               </Text>
 
               {renderPaymentTable(chunk, startIndex, chunkIndex, chunks.length)}

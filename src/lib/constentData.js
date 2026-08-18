@@ -18,9 +18,9 @@ export const TrsutData={
     stampImg:stampImg,
     headerImg:heaaderImg,
     topTitle:[
-    
-        "॥ श्री गणेशाय नमः ॥",
-        "|| जय माताजी ||"
+    "|| मल्लीनाथ माँ रूपादे नमः ||",
+        "|| श्री गणेशाय नमः ||",
+        "|| श्री बाबा रामदेव नमः ||"
     ]
 }
 

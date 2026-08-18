@@ -20,14 +20,18 @@ export async function OPTIONS() {
 
 export async function POST(req) {
   try {
-    const { rowData,  agentInfo } =
-      await req.json();
+    const { rowData, agentInfo, paymentStatus = "all" } = await req.json();
+
+    const mode = ["pending", "paid"].includes(paymentStatus)
+      ? paymentStatus
+      : "all";
 
     const pdfBuffer = await renderToBuffer(
       <AllPaymentPdf
-       rowData={rowData}
+        rowData={rowData}
         agentInfo={agentInfo}
-        fileName={"all-payment-status.pdf"}
+        paymentStatus={mode}
+        fileName={`all-payment-status-${mode}.pdf`}
       />
     );
 
@@ -36,7 +40,7 @@ export async function POST(req) {
       headers: {
         ...corsHeaders,
         "Content-Type": "application/pdf",
-        "Content-Disposition": 'inline; filename="payment-report.pdf"',
+        "Content-Disposition": `inline; filename="payment-report-${mode}.pdf"`,
       },
     });
   } catch (error) {

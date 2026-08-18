@@ -646,11 +646,20 @@ const Certificate=({data,selectedProgram})=>{
               </View>
                 <View style={[styles.fieldGroup,{position:'relative'}]}>
                 <Text style={styles.labelText}>Agent :</Text>
-                <Text style={[styles.valueText,{
-                  position:'absolute',
-                  right:0,
-                  left:50,
-                }]}>{data?.agentName + " " || data?.addedByName + " "}</Text>
+            <Text
+  style={[
+    styles.valueText,
+    {
+      position: 'absolute',
+      right: 0,
+      left: 50,
+    },
+  ]}
+>
+  {[data?.agentName, data?.addedByName]
+    .filter(Boolean)
+    .join(' ')}
+</Text>
               </View>
         
             </View>

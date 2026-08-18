@@ -61,12 +61,13 @@ async function fetchPaymentData(uid, agentId, programId, groupId = null) {
     paymentsByMember[key].push({ id: doc.id, ...p });
   });
 
-  // Aggregate rows
+  // Aggregate rows — EVERY active member is included, even one with no closing
+  // payments yet (those come through with zero totals and status 'none') so the
+  // list/PDF is a complete roster rather than only members who owe or paid.
   const rows = [];
   membersSnap.forEach((doc) => {
     const m = doc.data();
-    const payments = paymentsByMember[doc.id];
-    if (!payments?.length) return;
+    const payments = paymentsByMember[doc.id] || [];
 
     let totalPaid = 0, totalPending = 0, paidCount = 0, pendingCount = 0;
 
@@ -88,17 +89,78 @@ async function fetchPaymentData(uid, agentId, programId, groupId = null) {
       fatherName: m.fatherName,
       phone: m.phone,
       village: m.village,
+      applicationNumber: m.applicationNumber || '',
+      guardian: m.guardian || '',
+      guardianRelation: m.guardianRelation || '',
+      district: m.district || '',
+      state: m.state || '',
       programName,
       programId,
       totalPaid,
       totalPending,
       paidCount,
       pendingCount,
+      // This member's own closing (marriage) — set by the Closing form
+      isClosed: m.marriage_flag === true,
+      closingDate: m.closing_date || '',
+      closingDateQuery: m.closing_date_query || '',
+      closingGroupName: m.closingGroupName || '',
       status: paidCount > 0 && pendingCount > 0 ? 'both'
         : paidCount > 0 ? 'paid'
-        : 'pending',
+        : pendingCount > 0 ? 'pending'
+        : 'none',
     });
   });
+
+  // ── Closed members ────────────────────────────────────────────────────────
+  // The agent's own members whose closing (marriage) has happened. For these we
+  // report what has been COLLECTED FOR them — contributions come from members
+  // across all agents, so this needs its own query on `closingMemberId` rather
+  // than reusing the payer-side result above.
+  const closedMembers = rows.filter((r) => r.isClosed);
+
+  if (closedMembers.length > 0) {
+    const ids = closedMembers.map((r) => r.memberId);
+    const chunks = [];
+    for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
+
+    const snaps = await Promise.all(
+      chunks.map((chunk) =>
+        base.collection('payment_pending').where('closingMemberId', 'in', chunk).get()
+      )
+    );
+
+    const byClosing = {};
+    snaps.forEach((snap) =>
+      snap.forEach((doc) => {
+        const p = doc.data();
+        if (p.delete_flag === true) return;
+        const key = p.closingMemberId;
+        if (!byClosing[key]) {
+          byClosing[key] = { collected: 0, due: 0, paidCount: 0, pendingCount: 0 };
+        }
+        const amt = Number(p.payAmount || 0);
+        if (p.status === 'paid') {
+          byClosing[key].collected += amt;
+          byClosing[key].paidCount++;
+        } else {
+          byClosing[key].due += amt;
+          byClosing[key].pendingCount++;
+        }
+      })
+    );
+
+    closedMembers.forEach((r) => {
+      const agg = byClosing[r.memberId] || {
+        collected: 0, due: 0, paidCount: 0, pendingCount: 0,
+      };
+      r.collectedForMember   = agg.collected;
+      r.dueForMember         = agg.due;
+      r.contributorsPaid     = agg.paidCount;
+      r.contributorsPending  = agg.pendingCount;
+      r.contributorsTotal    = agg.paidCount + agg.pendingCount;
+    });
+  }
 
   // Closing groups list
   const closingGroups = groupsSnap.docs.map((d) => ({
@@ -109,9 +171,11 @@ async function fetchPaymentData(uid, agentId, programId, groupId = null) {
 
   return {
     rows: rows.map((r, i) => ({ ...r, index: i + 1 })),
+    closedRows: closedMembers.map((r, i) => ({ ...r, index: i + 1 })),
     closingGroups,
     programName,
     total: rows.length,
+    totalClosed: closedMembers.length,
   };
 }
 
