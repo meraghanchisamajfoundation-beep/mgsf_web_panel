@@ -29,6 +29,7 @@ import { checkAadhaarExists, createMemberInTransaction, generateUnique4Digit, se
 import { districtsByState, gender, states } from '@/lib/staticData';
 import { setgetMemberDataChange } from '@/redux/slices/commonSlice';
 import { createMemberAccount, generateMemberPassword } from '@/lib/commonFun';
+import { getData } from '@/lib/services/firebaseService';
 
 const { Option } = Select;
 const { TextArea } = Input;
