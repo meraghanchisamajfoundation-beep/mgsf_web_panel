@@ -15,7 +15,9 @@ import {
     ExclamationCircleOutlined,
     WarningOutlined,
     ReloadOutlined,
+    TeamOutlined,
 } from '@ant-design/icons'
+import { useSelector } from 'react-redux'
 import { getData } from '@/lib/services/firebaseService'
 import {
     collection, addDoc, getDocs, updateDoc, deleteDoc,
@@ -152,6 +154,10 @@ const GenerateRasidEntry = ({ open, setOpen, selectedProgram, user, closingMembe
     const [closingMembersStatus, setClosingMembersStatus] = useState(new Map())
     const [closingGroups, setClosingGroups] = useState([])
     const [selectedGroupIds, setSelectedGroupIds] = useState([])
+
+    /* agent filter for the payer list — null means "all agents" */
+    const agentsList = useSelector((state) => state.data.agentsList) || []
+    const [agentFilter, setAgentFilter] = useState(null)
 
     /* mode + delete options + shared progress */
     const [mode, setMode] = useState('generate')        // 'generate' | 'delete' | 'cleanup'
@@ -712,6 +718,7 @@ const GenerateRasidEntry = ({ open, setOpen, selectedProgram, user, closingMembe
             setSelectedClosingMembers([])
             setSelectedMembers([])
             setSelectedGroupIds([])
+            setAgentFilter(null)
             setPaymentGenerationStatus({})
             setClosingMembersStatus(new Map())
             setMode('generate')
@@ -738,10 +745,59 @@ const GenerateRasidEntry = ({ open, setOpen, selectedProgram, user, closingMembe
     const selectAllClosingMembers = () =>
         setSelectedClosingMembers(filteredClosingMembers.map(m => m.id))
 
+    /* ── Agent filter for the payer list ──────────────────────────────────
+     * null          → all agents (default)
+     * '__none__'    → members with no agent assigned
+     * <agentId>     → that agent's members only
+     */
+    const agentNameById = new Map(
+        agentsList.map(a => [a.id, a.displayName || a.name || a.agentName || 'Unnamed agent'])
+    )
+
+    const agentOptions = (() => {
+        const counts = new Map()
+        let noAgent = 0
+        allMembersData.forEach(m => {
+            if (!m.agentId) { noAgent++; return }
+            counts.set(m.agentId, (counts.get(m.agentId) || 0) + 1)
+        })
+        const opts = Array.from(counts.entries())
+            .map(([id, count]) => ({
+                value: id,
+                count,
+                label: `${agentNameById.get(id) || 'Unknown agent'} (${count})`,
+            }))
+            .sort((a, b) => a.label.localeCompare(b.label))
+        if (noAgent > 0) opts.push({ value: '__none__', count: noAgent, label: `No agent (${noAgent})` })
+        return opts
+    })()
+
+    const membersForSelection = agentFilter === null
+        ? allMembersData
+        : agentFilter === '__none__'
+            ? allMembersData.filter(m => !m.agentId)
+            : allMembersData.filter(m => m.agentId === agentFilter)
+
     // Payers: skip members that would be skipped anyway (blocked / inactive)
-    const selectableMembers = allMembersData.filter(
+    const selectableMembers = membersForSelection.filter(
         m => m.status !== 'blocked' && m.active_flag !== false
     )
+
+    /* Switching agent prunes any selection that is no longer visible, so you
+     * never generate for members you can't see. */
+    const handleAgentFilterChange = (val) => {
+        const next = val ?? null
+        setAgentFilter(next)
+        const visible = new Set(
+            (next === null
+                ? allMembersData
+                : next === '__none__'
+                    ? allMembersData.filter(m => !m.agentId)
+                    : allMembersData.filter(m => m.agentId === next)
+            ).map(m => m.id)
+        )
+        setSelectedMembers(prev => prev.filter(id => visible.has(id)))
+    }
     const allMembersSelected =
         selectableMembers.length > 0 &&
         selectableMembers.every(m => selectedMembers.includes(m.id))
@@ -1346,6 +1402,26 @@ const GenerateRasidEntry = ({ open, setOpen, selectedProgram, user, closingMembe
                     </div>
                 )}
 
+                {/* ── Agent filter for the payer list ── */}
+                <div style={styles.sectionLabel}>
+                    <TeamOutlined /> Filter members by agent
+                    {agentFilter !== null && (
+                        <span style={styles.countPill}>{membersForSelection.length} member(s)</span>
+                    )}
+                </div>
+                <Select
+                    style={{ width: '100%', marginBottom: 14 }}
+                    placeholder={`All agents (${allMembersData.length} members)`}
+                    value={agentFilter}
+                    onChange={handleAgentFilterChange}
+                    disabled={isBusy}
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                    options={agentOptions}
+                    notFoundContent="No agents found"
+                />
+
                 {/* ── Members select ── */}
                 <div style={styles.sectionHeader}>
                     <div style={styles.sectionLabel}>
@@ -1406,7 +1482,7 @@ const GenerateRasidEntry = ({ open, setOpen, selectedProgram, user, closingMembe
                         </>
                     )}
                 >
-                    {allMembersData.map((member) => {
+                    {membersForSelection.map((member) => {
                         let paymentCount = 0
                         for (const cid of selectedClosingMembers)
                             if (existingPaymentsMap.has(`${cid}_${member.id}`)) paymentCount++
@@ -1431,6 +1507,11 @@ const GenerateRasidEntry = ({ open, setOpen, selectedProgram, user, closingMembe
                                     {member.phone && ` · ${member.phone}`}
                                     {member.closingGroupName && (
                                         <span style={{ color: '#8c8c8c', fontSize: 11 }}> · Group: {member.closingGroupName}</span>
+                                    )}
+                                    {member.agentId && (
+                                        <span style={{ color: '#8c8c8c', fontSize: 11 }}>
+                                            {' '}· Agent: {agentNameById.get(member.agentId) || 'Unknown'}
+                                        </span>
                                     )}
                                 </div>
                             </Option>
