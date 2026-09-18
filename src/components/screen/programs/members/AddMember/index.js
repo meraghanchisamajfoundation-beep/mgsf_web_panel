@@ -1535,7 +1535,7 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
                           <Upload
                             listType="picture-card"
                             fileList={guardianDocument}
-                            onChange={handleUploadChange('guardianDocument')}
+                            onChange={handleUploadChange(setGuardianDocument)}
                             onPreview={onPreview}
                             beforeUpload={() => false}
                             maxCount={1}

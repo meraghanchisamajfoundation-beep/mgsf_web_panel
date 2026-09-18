@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Drawer, Form, Input, InputNumber, Select, Space, Card, Typography, App, Radio, message } from 'antd';
-import { FiPlusCircle, FiTrash2, FiUser, FiMapPin, FiDollarSign, FiCalendar, FiTag, FiEdit2, FiSave } from 'react-icons/fi';
+import { Button, Drawer, Form, Input, InputNumber, Select, Space, Card, Typography, App, Radio, Alert, Tag, message } from 'antd';
+import { FiPlusCircle, FiTrash2, FiUser, FiMapPin, FiDollarSign, FiCalendar, FiTag, FiEdit2, FiSave, FiHash } from 'react-icons/fi';
+import { REG_DEFAULTS, previewRegistrationNumbers } from '@/lib/helper';
 import { useAuth } from '@/lib/AuthProvider';
 import { collection, addDoc, updateDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -32,6 +33,27 @@ const AddProgramEdit = ({ program, mode = 'add', onSuccess, triggerButton = null
     { label: 'Other', value: 'isOther' },
   ];
 
+  // Live preview of the registration number format. Watching the fields keeps
+  // the sample in sync as the user types, so the format is obvious before save.
+  const regPrefix  = Form.useWatch('regPrefix', form);
+  const regMode    = Form.useWatch('regMode', form);
+  const regDigits  = Form.useWatch('regDigits', form);
+  const regStartNo = Form.useWatch('regStartNo', form);
+
+  // Numbers already issued in this program — a series must not restart below it
+  const issuedCounter = parseInt(program?.regCounter, 10) || 0;
+
+  const regSamples = previewRegistrationNumbers(
+    {
+      regPrefix: regPrefix ?? REG_DEFAULTS.regPrefix,
+      regMode: regMode ?? REG_DEFAULTS.regMode,
+      regDigits: regDigits ?? REG_DEFAULTS.regDigits,
+      regStartNo: regStartNo ?? REG_DEFAULTS.regStartNo,
+      regCounter: mode === 'edit' ? issuedCounter : 0,
+    },
+    3
+  );
+
   // Initialize form with program data when in edit mode
   useEffect(() => {
     if (mode === 'edit' && program && isDrawerOpen) {
@@ -57,11 +79,17 @@ const AddProgramEdit = ({ program, mode = 'add', onSuccess, triggerButton = null
         category: selectedCategory,
         ageGroups: program.ageGroups || [],
         locationGroups: program.locationGroups || [],
+        // Registration number settings (fall back to defaults for older programs)
+        regPrefix: program.regPrefix ?? REG_DEFAULTS.regPrefix,
+        regMode: program.regMode === 'series' ? 'series' : REG_DEFAULTS.regMode,
+        regDigits: program.regDigits ?? REG_DEFAULTS.regDigits,
+        regStartNo: program.regStartNo ?? REG_DEFAULTS.regStartNo,
       });
     } else if (mode === 'add' && isDrawerOpen) {
       // Reset form for add mode
       setIsSelected(false);
       form.resetFields();
+      form.setFieldsValue({ ...REG_DEFAULTS });
     }
   }, [mode, program, isDrawerOpen, form]);
 
@@ -97,6 +125,14 @@ const AddProgramEdit = ({ program, mode = 'add', onSuccess, triggerButton = null
         categoryFlags[values.category] = true;
       }
 
+      // Registration number settings for this yojna
+      const regSettings = {
+        regPrefix: (values.regPrefix ?? REG_DEFAULTS.regPrefix).trim(),
+        regMode: values.regMode === 'series' ? 'series' : 'random',
+        regDigits: parseInt(values.regDigits, 10) || REG_DEFAULTS.regDigits,
+        regStartNo: parseInt(values.regStartNo, 10) || REG_DEFAULTS.regStartNo,
+      };
+
       if (mode === 'add') {
         const programsRef = collection(db, "users", user.uid, "programs");
         await addDoc(programsRef, {
@@ -106,6 +142,8 @@ const AddProgramEdit = ({ program, mode = 'add', onSuccess, triggerButton = null
           noteLine: values.noteLine || '',
           about: values.about,
           ...categoryFlags,
+          ...regSettings,
+          regCounter: 0,          // series starts fresh for a new program
           isSelected: isSelected,
           ageGroups: ageGroupsWithId,
           memberCount:values?.memberCount,
@@ -126,6 +164,9 @@ const AddProgramEdit = ({ program, mode = 'add', onSuccess, triggerButton = null
           noteLine: values.noteLine || '',
           about: values.about,
           ...categoryFlags,
+          ...regSettings,
+          // regCounter is NOT written here — it belongs to the member-creation
+          // transaction. Overwriting it from this form would re-issue numbers.
           isSelected: isSelected,
             memberCount:parseInt(values?.memberCount) || 0,
           inactivemembercount:parseInt(values?.inactivemembercount) || 0,
@@ -146,6 +187,7 @@ const AddProgramEdit = ({ program, mode = 'add', onSuccess, triggerButton = null
           noteLine: values.noteLine || '',
           about: values.about,
           ...categoryFlags,
+          ...regSettings,
           isSelected: isSelected,
             memberCount:values?.memberCount,
               inactivemembercount:values?.inactivemembercount,
@@ -501,6 +543,95 @@ const AddProgramEdit = ({ program, mode = 'add', onSuccess, triggerButton = null
                   </Radio.Group>
                 </Form.Item>
               </Space>
+            </Card>
+
+            {/* Registration Number Settings */}
+            <Card className="border border-gray-200">
+              <Title level={5} className="!mb-1 flex items-center gap-2">
+                <FiHash className="text-green-600" />
+                Registration Number
+              </Title>
+              <Text type="secondary" className="block !mb-4 text-xs">
+                Har yojna ka apna reg. number format — prefix alag rakh sakte hain.
+              </Text>
+
+              <Form.Item
+                label="Prefix"
+                name="regPrefix"
+                tooltip='Reg. number ke aage lagega. Jaise "MG" → MG000123. Khali bhi chhod sakte hain.'
+              >
+                <Input
+                  placeholder="R"
+                  className="h-10"
+                  maxLength={6}
+                  onChange={(e) =>
+                    form.setFieldsValue({ regPrefix: e.target.value.toUpperCase() })
+                  }
+                />
+              </Form.Item>
+
+              <Form.Item label="Number Type" name="regMode">
+                <Radio.Group className="w-full">
+                  <Space direction="vertical" className="w-full">
+                    <Radio value="series">
+                      <strong>Series</strong> — 1, 2, 3 … kramvaar (recommended)
+                    </Radio>
+                    <Radio value="random">
+                      <strong>Random</strong> — har baar naya random number
+                    </Radio>
+                  </Space>
+                </Radio.Group>
+              </Form.Item>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Form.Item
+                  label="Digits"
+                  name="regDigits"
+                  tooltip="Kitne ank ka number ho. Series me zero se pad hoga (5 → 00042)."
+                >
+                  <InputNumber min={3} max={10} className="w-full h-10" />
+                </Form.Item>
+
+                {regMode === 'series' && (
+                  <Form.Item
+                    label="Start From"
+                    name="regStartNo"
+                    tooltip="Series is number se shuru hogi."
+                  >
+                    <InputNumber min={1} className="w-full h-10" />
+                  </Form.Item>
+                )}
+              </div>
+
+              {/* Live preview */}
+              <div className="rounded-md bg-gray-50 border border-gray-200 px-3 py-2">
+                <Text type="secondary" className="text-xs block mb-1">
+                  Agle members ko kuch aise number milenge:
+                </Text>
+                <Space wrap>
+                  {regSamples.map((s, i) => (
+                    <Tag key={i} color="green" className="font-mono !text-sm">{s}</Tag>
+                  ))}
+                </Space>
+              </div>
+
+              {mode === 'edit' && regMode === 'series' && issuedCounter > 0 && (
+                <Alert
+                  type="info"
+                  showIcon
+                  className="mt-3 text-xs"
+                  message={`Is yojna me abhi tak ${issuedCounter} number issue ho chuke hain — series wahi se aage badhegi, "Start From" sirf tab lagta hai jab counter usse peeche ho.`}
+                />
+              )}
+
+              {regMode === 'random' && (
+                <Alert
+                  type="warning"
+                  showIcon
+                  className="mt-3 text-xs"
+                  message="Random me do members ko same number mil sakta hai. Series me aisa nahi hota — counter transaction ke andar badhta hai."
+                />
+              )}
             </Card>
 
             {/* Age Groups */}

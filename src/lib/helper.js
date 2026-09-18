@@ -37,6 +37,106 @@ export function generateUnique4Digit() {
     return num;
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   REGISTRATION NUMBER — per-program (yojna) configuration
+
+   Each program document can carry its own numbering rules:
+
+     regPrefix   string   e.g. "MG"  → MG000123        (default "R")
+     regMode     string   "series" | "random"          (default "random")
+     regDigits   number   digit count / zero padding   (default 6)
+     regStartNo  number   first number in series mode  (default 1)
+     regCounter  number   INTERNAL — last issued serial, managed by the
+                          transaction so two members can never get the
+                          same number
+
+   Series mode is safer than random: the counter is bumped inside the same
+   Firestore transaction that creates the member, so collisions are
+   impossible. Random can theoretically repeat.
+   ════════════════════════════════════════════════════════════════════════ */
+
+export const REG_DEFAULTS = {
+    regPrefix: 'R',
+    regMode: 'random',
+    regDigits: 6,
+    regStartNo: 1,
+};
+
+const clampDigits = (d) => {
+    const n = parseInt(d, 10);
+    if (!Number.isFinite(n)) return REG_DEFAULTS.regDigits;
+    return Math.min(Math.max(n, 3), 10);
+};
+
+/** Cryptographically random integer with exactly `digits` digits. */
+function randomNumberOfDigits(digits) {
+    const d = clampDigits(digits);
+    const min = Math.pow(10, d - 1);
+    const range = min * 9;
+
+    // crypto in the browser / node 19+, Math.random as a last resort
+    const c = (typeof globalThis !== 'undefined' && globalThis.crypto) || null;
+    if (c?.getRandomValues) {
+        const arr = new Uint32Array(1);
+        c.getRandomValues(arr);
+        return (arr[0] % range) + min;
+    }
+    return Math.floor(Math.random() * range) + min;
+}
+
+/** Read the numbering config off a program document, filling in defaults. */
+export function getRegConfig(programData = {}) {
+    return {
+        regPrefix: programData.regPrefix ?? REG_DEFAULTS.regPrefix,
+        regMode: programData.regMode === 'series' ? 'series' : 'random',
+        regDigits: clampDigits(programData.regDigits ?? REG_DEFAULTS.regDigits),
+        regStartNo: parseInt(programData.regStartNo, 10) > 0
+            ? parseInt(programData.regStartNo, 10)
+            : REG_DEFAULTS.regStartNo,
+        regCounter: parseInt(programData.regCounter, 10) || 0,
+    };
+}
+
+/**
+ * Build the next registration number for a program.
+ * @returns {{ registrationNumber: string, nextCounter: number|null }}
+ *          `nextCounter` is non-null only in series mode — the caller must
+ *          persist it on the program document inside the same transaction.
+ */
+export function buildRegistrationNumber(programData = {}) {
+    const cfg = getRegConfig(programData);
+
+    if (cfg.regMode === 'series') {
+        const next = cfg.regCounter >= cfg.regStartNo
+            ? cfg.regCounter + 1
+            : cfg.regStartNo;
+        return {
+            registrationNumber: `${cfg.regPrefix}${String(next).padStart(cfg.regDigits, '0')}`,
+            nextCounter: next,
+        };
+    }
+
+    return {
+        registrationNumber: `${cfg.regPrefix}${randomNumberOfDigits(cfg.regDigits)}`,
+        nextCounter: null,
+    };
+}
+
+/** Sample numbers for the "what will it look like" preview in the yojna form. */
+export function previewRegistrationNumbers(config = {}, count = 3) {
+    const cfg = getRegConfig(config);
+    const out = [];
+    for (let i = 0; i < count; i++) {
+        if (cfg.regMode === 'series') {
+            const n = (cfg.regCounter >= cfg.regStartNo ? cfg.regCounter + 1 : cfg.regStartNo) + i;
+            out.push(`${cfg.regPrefix}${String(n).padStart(cfg.regDigits, '0')}`);
+        } else {
+            out.push(`${cfg.regPrefix}${randomNumberOfDigits(cfg.regDigits)}`);
+        }
+    }
+    return out;
+}
+
 /**
  * परमाणु रूप से सदस्य बनाता है और प्रोग्राम और एजेंट दोनों काउंटरों को बढ़ाता है।
  * @param {string} programDocPath - प्रोग्राम दस्तावेज़ का पूर्ण पथ।
@@ -84,9 +184,10 @@ export async function createMemberInTransaction(
         // Calculate new member number
         const currentMemberCount = programDoc.data().memberCount || 0;
         const newMemberCount = currentMemberCount + 1;
-        
-        // Generate registration number
-        const newRegistrationNumber = 'R' + generate6DigitRegNo();
+
+        // Generate registration number using THIS program's numbering rules
+        const { registrationNumber: newRegistrationNumber, nextCounter } =
+            buildRegistrationNumber(programDoc.data());
 
         // Prepare member data
         const newMemberData = {
@@ -99,9 +200,12 @@ export async function createMemberInTransaction(
         // 3. ALL WRITES
         // **********************************************
 
-        // Update program document counter
+        // Update program document counter.
+        // In series mode the reg counter is bumped in the SAME transaction,
+        // so two concurrent members can never receive the same number.
         transaction.update(programDocRef, {
-            memberCount: newMemberCount
+            memberCount: newMemberCount,
+            ...(nextCounter !== null && { regCounter: nextCounter }),
         });
 
         // Update agent document program-specific counter
@@ -245,8 +349,9 @@ export async function acceptMemberWithCounterUpdate(
         const currentMemberCount = programDoc.data().memberCount || 0;
         const newMemberCount = parseInt(currentMemberCount) + 1;
 
-        // Generate registration number
-        const newRegistrationNumber = 'R' + generate6DigitRegNo();
+        // Generate registration number using THIS program's numbering rules
+        const { registrationNumber: newRegistrationNumber, nextCounter } =
+            buildRegistrationNumber(programDoc.data());
 
         // Prepare updated member data
         const updatedMemberData = {
@@ -261,9 +366,10 @@ export async function acceptMemberWithCounterUpdate(
         // 3. PERFORM ALL WRITES
         // **********************************************
         
-        // 3a. Update program member count
+        // 3a. Update program member count (+ reg series counter when in series mode)
         transaction.update(programDocRef, {
             memberCount: newMemberCount,
+            ...(nextCounter !== null && { regCounter: nextCounter }),
             updatedAt: new Date().toISOString() // Optional: update timestamp
         });
 

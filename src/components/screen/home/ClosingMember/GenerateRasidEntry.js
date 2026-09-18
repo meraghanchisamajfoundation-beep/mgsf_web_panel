@@ -127,14 +127,8 @@ const avatarColor = (i) => ['teal', 'amber', 'gray'][i % 3]
 // Firestore hard-caps a batch at 500 ops; stay under it with headroom.
 const BATCH_LIMIT = 400
 
-const parseDDMMYYYY = (dateStr) => {
-    if (!dateStr || typeof dateStr !== 'string') return null
-    const parts = dateStr.split('-')
-    if (parts.length !== 3) return null
-    const [day, month, year] = parts.map(Number)
-    if (!day || !month || !year) return null
-    return new Date(year, month - 1, day)
-}
+
+
 
 /* ─── Component ──────────────────────────────────────────────────────── */
 const GenerateRasidEntry = ({ open, setOpen, selectedProgram, user, closingMemberList }) => {

@@ -656,10 +656,8 @@ const Certificate=({data,selectedProgram})=>{
     },
   ]}
 >
-  {[data?.agentName, data?.addedByName]
-    .filter(Boolean)
-    .join(' ')}
-</Text>
+  {data?.agentName || data?.addedByName}
+</Text>  
               </View>
         
             </View>
