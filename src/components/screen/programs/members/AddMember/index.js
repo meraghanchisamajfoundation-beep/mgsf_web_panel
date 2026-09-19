@@ -430,18 +430,19 @@ const AddMember = () => {
     }
   };
 
-  // Handle Application Number validation
+  // एप्लीकेशन नंबर — duplicate ALLOWED.
+  // यह सिर्फ़ जानकारी के लिए है ताकि user को पता चले कि नंबर पहले से है;
+  // यह कहीं भी save नहीं रोकता। Value string है (जैसे "67A"), इसलिए
+  // query भी raw string पर चलती है, Number() पर नहीं।
 const checkApplicationNumberDuplicate = async (appNumber, programId) => {
   try {
-    if (!appNumber || !programId || !user?.uid) return false;
-
-    const appNumberNum = Number(appNumber);
-    if (isNaN(appNumberNum)) return false;
+    const value = String(appNumber ?? '').trim();
+    if (!value || !programId || !user?.uid) return false;
 
     const membersRef = collection(db, "users", user.uid, "programs", programId, "members");
     const q = query(
       membersRef,
-      where("applicationNumber", "==", appNumberNum.toString()),
+      where("applicationNumber", "==", value),
       where("delete_flag", "!=", true),
       limit(1)
     );
@@ -455,62 +456,26 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
 };
 
   const handleApplicationNumberBlur = async (e) => {
-    const appNumber = e.target.value;
-    
-    if (!appNumber) {
-      setApplicationNumberError(null);
-      form.setFields([{ name: 'applicationNumber', errors: [] }]);
-      return;
-    }
-    
-    // Check if it's a number
-    const appNumberNum = parseInt(appNumber);
-    if (isNaN(appNumberNum)) {
-      setApplicationNumberError('कृपया मान्य संख्या दर्ज करें');
-      form.setFields([
-        {
-          name: 'applicationNumber',
-          errors: ['कृपया मान्य संख्या दर्ज करें'],
-        },
-      ]);
-      return;
-    }
-    
-    const programId = form.getFieldValue('program');
-    if (!programId) {
-      message.warning('कृपया पहले कार्यक्रम का चयन करें।');
-      return;
-    }
-    
-    setIsApplicationNumberChecking(true);
+    const appNumber = String(e.target.value ?? '').trim();
+
+    // कोई error state नहीं — duplicate अब मान्य है
     setApplicationNumberError(null);
-    
+    form.setFields([{ name: 'applicationNumber', errors: [] }]);
+
+    if (!appNumber) return;
+
+    const programId = form.getFieldValue('program');
+    if (!programId) return;
+
+    setIsApplicationNumberChecking(true);
     try {
       const isDuplicate = await checkApplicationNumberDuplicate(appNumber, programId);
-      
       if (isDuplicate) {
-        const errorMessage = `एप्लीकेशन नंबर ${appNumber} पहले से मौजूद है। कृपया दूसरा नंबर दर्ज करें।`;
-        setApplicationNumberError(errorMessage);
-        form.setFields([
-          {
-            name: 'applicationNumber',
-            errors: [errorMessage],
-          },
-        ]);
-        message.error(errorMessage);
-      } else {
-        setApplicationNumberError(null);
-        form.setFields([
-          {
-            name: 'applicationNumber',
-            errors: [],
-          },
-        ]);
-        message.success('एप्लीकेशन नंबर उपलब्ध है');
+        // सिर्फ़ सूचना — save फिर भी हो जाएगा
+        message.warning(`ध्यान दें: एप्लीकेशन नंबर ${appNumber} पहले से मौजूद है (duplicate की अनुमति है)`);
       }
     } catch (error) {
       console.error('Error checking application number:', error);
-      message.error('एप्लीकेशन नंबर सत्यापन में विफल');
     } finally {
       setIsApplicationNumberChecking(false);
     }
@@ -628,30 +593,9 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
     
     const aadhaarNo = values.aadhaarNo;
     const programId = values.program;
-    const applicationNumberValue = parseInt(values.applicationNumber);
-    
-    // Validate application number
-    if (isNaN(applicationNumberValue)) {
-      message.error('कृपया मान्य एप्लीकेशन नंबर दर्ज करें');
-      setLoading(false);
-      return;
-    }
-    
-    // Check if application number already exists - FINAL CHECK before submission
-    try {
-      const isDuplicate = await checkApplicationNumberDuplicate(values.applicationNumber, programId);
-      
-      if (isDuplicate) {
-        message.error(`एप्लीकेशन नंबर ${values.applicationNumber} पहले से मौजूद है। कृपया दूसरा नंबर दर्ज करें।`);
-        setLoading(false);
-        return;
-      }
-    } catch (error) {
-      console.error('Error checking application number:', error);
-      message.error('एप्लीकेशन नंबर सत्यापन में विफल');
-      setLoading(false);
-      return;
-    }
+    // एप्लीकेशन नंबर अब string है (67A जैसे मान चलते हैं) और duplicate मान्य है,
+    // इसलिए यहाँ न numeric check है और न duplicate पर रोक।
+    const applicationNumberValue = String(values.applicationNumber ?? '').trim();
     
     if (aadhaarNo && programId) {
       try {
@@ -781,7 +725,7 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
         phoneAlt: values.phoneAlt || '',
         aadhaarNo: values.aadhaarNo,
         guardianAadharNo: values.guardianAadharNo || '',
-        applicationNumber: parseInt(values.applicationNumber),
+        applicationNumber: applicationNumberValue,
         bobDate: values.bobDate.format('DD-MM-YYYY'),
         currentAddress: values.currentAddress,
         village: values.village,
@@ -1074,25 +1018,13 @@ const checkApplicationNumberDuplicate = async (appNumber, programId) => {
                       label="एप्लीकेशन नंबर"
                       rules={[
                         { required: true, message: 'एप्लीकेशन नंबर आवश्यक है' },
-                        { 
-                          pattern: /^[0-9]+$/, 
-                          message: 'कृपया केवल संख्याएं दर्ज करें' 
-                        },
                         {
-                          validator: async (_, value) => {
-                            if (!value) return Promise.resolve();
-                            const programId = form.getFieldValue('program');
-                            if (!programId) return Promise.resolve();
-                            
-                            const isDuplicate = await checkApplicationNumberDuplicate(value, programId);
-                            if (isDuplicate) {
-                              return Promise.reject(new Error(`एप्लीकेशन नंबर ${value} पहले से मौजूद है`));
-                            }
-                            return Promise.resolve();
-                          }
-                        }
+                          // अक्षर भी चलेंगे — जैसे 67A, 12/B, 45-C
+                          pattern: /^[A-Za-z0-9/-]+$/,
+                          message: 'केवल अंक, अक्षर और - / की अनुमति है',
+                        },
                       ]}
-                      tooltip="एप्लीकेशन नंबर ऑटो-जनरेट होता है, लेकिन आप मैन्युअल भी दर्ज कर सकते हैं"
+                      tooltip="ऑटो-जनरेट होता है, पर मैन्युअल भी दर्ज कर सकते हैं। अक्षर चलेंगे (67A) और duplicate नंबर की भी अनुमति है।"
                     >
                       <Input
                         prefix={<IdcardOutlined />}

@@ -82,17 +82,18 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
   const [guardianDocument, setGuardianDocument] = useState([]);
   const [guardianDocumentBack, setGuardianDocumentBack] = useState([]);
 
+  // एप्लीकेशन नंबर — duplicate ALLOWED. यह सिर्फ़ चेतावनी दिखाने के लिए है,
+  // save कहीं नहीं रुकता। Value string है (67A जैसे मान चलते हैं)।
   const checkApplicationNumberDuplicate = async (appNumber) => {
     try {
-      if (!appNumber || !programId || !user?.uid) return false;
-      const appNumberNum = Number(appNumber);
-      if (isNaN(appNumberNum)) return false;
+      const value = String(appNumber ?? '').trim();
+      if (!value || !programId || !user?.uid) return false;
       const membersRef = collection(db, "users", user.uid, "programs", programId, "members");
       const q = query(
         membersRef,
-        where("applicationNumber", "==", appNumberNum.toString()),
+        where("applicationNumber", "==", value),
         where("delete_flag", "!=", true),
-        limit(1)
+        limit(2)
       );
       const snapshot = await getDocs(q);
       // Exclude current member from duplicate check
@@ -484,14 +485,7 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
     console.log(values, 'values');
 
     try {
-      // Check for duplicate application number before saving
-      const isDuplicate = await checkApplicationNumberDuplicate(values.applicationNumber);
-      if (isDuplicate) {
-        message.error(`एप्लीकेशन नंबर ${values.applicationNumber} पहले से मौजूद है।`);
-        setLoading(false);
-        return;
-      }
-
+      // duplicate एप्लीकेशन नंबर अब मान्य है — यहाँ कोई रोक नहीं
       const updatedData = { ...memberData };
 
       // Handle file uploads - only upload new files
@@ -584,7 +578,7 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
         phoneAlt: values.phoneAlt || '',
         aadhaarNo: values.aadhaarNo,
         guardianAadharNo: values.guardianAadharNo || '',
-        applicationNumber: values.applicationNumber,
+        applicationNumber: String(values.applicationNumber ?? '').trim(),
         bobDate: values.bobDate.format('DD-MM-YYYY'),
         currentAddress: values.currentAddress,
         village: values.village,
@@ -724,26 +718,27 @@ const EditMember = ({ memberData, programId, onSuccess, setOpen, open }) => {
                     label="एप्लीकेशन नंबर"
                     rules={[
                       { required: true, message: 'एप्लीकेशन नंबर आवश्यक है' },
-                      { 
-                        pattern: /^[0-9]+$/, 
-                        message: 'कृपया केवल संख्याएं दर्ज करें' 
-                      },
                       {
-                        validator: async (_, value) => {
-                          if (!value) return Promise.resolve();
-                          const isDuplicate = await checkApplicationNumberDuplicate(value);
-                          if (isDuplicate) {
-                            return Promise.reject(new Error(`एप्लीकेशन नंबर ${value} पहले से मौजूद है`));
-                          }
-                          return Promise.resolve();
-                        }
-                      }
+                        // अक्षर भी चलेंगे — जैसे 67A, 12/B, 45-C
+                        pattern: /^[A-Za-z0-9/-]+$/,
+                        message: 'केवल अंक, अक्षर और - / की अनुमति है',
+                      },
                     ]}
-                    tooltip="एप्लीकेशन नंबर"
+                    tooltip="अक्षर चलेंगे (जैसे 67A) और duplicate नंबर की भी अनुमति है"
                   >
                     <Input
                       prefix={<IdcardOutlined />}
                       placeholder="एप्लीकेशन नंबर"
+                      onBlur={async (e) => {
+                        const v = String(e.target.value ?? '').trim();
+                        if (!v) return;
+                        // सिर्फ़ सूचना — save फिर भी हो जाएगा
+                        if (await checkApplicationNumberDuplicate(v)) {
+                          message.warning(
+                            `ध्यान दें: एप्लीकेशन नंबर ${v} किसी और सदस्य के पास भी है (duplicate की अनुमति है)`
+                          );
+                        }
+                      }}
                     />
                   </Form.Item>
               </Col>
