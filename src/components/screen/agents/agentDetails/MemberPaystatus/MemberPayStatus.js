@@ -1,6 +1,6 @@
 "use client";
 import { useAuth } from '@/lib/AuthProvider';
-import { getAgentMemberPaystatus } from '@/lib/helper';
+import { attachClosingMemberDetails, getAgentMemberPaystatus } from '@/lib/helper';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -92,9 +92,22 @@ const { generatePdf } = usePdfGenerator();
       console.log(data,"data marrige data")
 
       if (data?.success) {
-        setReportData(data.report || []);
+        // Closed members' वारिसदार / relation / state come from their own
+        // member docs (payment entries don't store them). If this lookup
+        // fails we still show the report without those fields.
+        let report = data.report || [];
+        try {
+          report = await attachClosingMemberDetails({
+            userId: user.uid,
+            programId: selectedProgram.id,
+            report,
+          });
+        } catch (e) {
+          console.warn('Could not load closing member details:', e);
+        }
+        setReportData(report);
         setSummary(data.summary || {});
-        setFilteredData(data.report || []);
+        setFilteredData(report);
         if (data.groupInfo) {
           message.success(
             `Showing payments for group: ${data.groupInfo.name} (${data.groupInfo.memberCount} members)`

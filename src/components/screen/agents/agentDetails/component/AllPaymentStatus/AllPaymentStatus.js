@@ -246,8 +246,22 @@ const [pdfLoading, setPdfLoading] = useState(false);
     [rowData]
   );
 
+  // Closed members split by what has been collected FOR them:
+  // 'closed_paid'    → nothing left to collect (all contributors paid)
+  // 'closed_pending' → still some amount due from contributors
+  const filterClosedRows = useCallback(
+    (mode) => {
+      if (mode === 'closed_paid')
+        return closedRows.filter((r) => (r.contributorsPaid || 0) > 0 && (r.contributorsPending || 0) === 0);
+      if (mode === 'closed_pending')
+        return closedRows.filter((r) => (r.contributorsPending || 0) > 0);
+      return closedRows;
+    },
+    [closedRows]
+  );
+
   const generatePdf = useCallback(async (mode = 'all') => {
-    const source = mode === 'closed' ? closedRows : filterRowsForPdf(mode);
+    const source = mode.startsWith('closed') ? filterClosedRows(mode) : filterRowsForPdf(mode);
     const rows = source.map((r, i) => ({ ...r, index: i + 1 }));
 
     if (rows.length === 0) {
@@ -258,6 +272,10 @@ const [pdfLoading, setPdfLoading] = useState(false);
             ? 'No member has any pending payment.'
             : mode === 'closed'
               ? 'No closed member for this agent.'
+              : mode === 'closed_paid'
+                ? 'No closed member is fully paid yet.'
+                : mode === 'closed_pending'
+                  ? 'No closed member has pending amount.'
               : 'No records to export.'
       );
       return;
@@ -290,7 +308,7 @@ const [pdfLoading, setPdfLoading] = useState(false);
     } finally {
       setPdfLoading(false);
     }
-  }, [filterRowsForPdf, closedRows, agentInfo]);
+  }, [filterRowsForPdf, filterClosedRows, agentInfo]);
 
   const pdfMenuItems = [
     {
@@ -316,6 +334,18 @@ const [pdfLoading, setPdfLoading] = useState(false);
       label: `Closed Members (${closedRows.length})`,
       icon: <TeamOutlined />,
       disabled: closedRows.length === 0,
+    },
+    {
+      key: 'closed_pending',
+      label: `Closed – Pending (${filterClosedRows('closed_pending').length})`,
+      icon: <ClockCircleOutlined />,
+      disabled: filterClosedRows('closed_pending').length === 0,
+    },
+    {
+      key: 'closed_paid',
+      label: `Closed – Fully Paid (${filterClosedRows('closed_paid').length})`,
+      icon: <CheckCircleOutlined />,
+      disabled: filterClosedRows('closed_paid').length === 0,
     },
   ];
   return (

@@ -7,7 +7,7 @@ import {
     getDocs,
     increment, 
   getDoc,
-  
+  documentId,
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
@@ -652,6 +652,60 @@ export async function getAgentMemberPaystatus({
   }
 
   return res.json();
+}
+
+
+/**
+ * Attach the CLOSED member's own details (वारिसदार / हकदार, relation, state,
+ * village, father name …) to every marriage entry of a payment report.
+ *
+ * payment_pending docs don't carry the closed member's guardian, so we read
+ * the closed members' docs once (30 ids per query) and merge the fields in.
+ * Values already present on the entry win over nothing, but the member doc
+ * is preferred for guardian/relation/state since it is the source of truth.
+ */
+export async function attachClosingMemberDetails({ userId, programId, report = [] }) {
+  if (!userId || !programId || !Array.isArray(report) || report.length === 0) return report;
+
+  const ids = [
+    ...new Set(
+      report.flatMap((m) => (m.marriages || []).map((x) => x.closingMemberId)).filter(Boolean)
+    ),
+  ];
+  if (ids.length === 0) return report;
+
+  const membersRef = collection(db, `users/${userId}/programs/${programId}/members`);
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
+
+  const snaps = await Promise.all(
+    chunks.map((chunk) => getDocs(query(membersRef, where(documentId(), "in", chunk))))
+  );
+
+  const map = {};
+  snaps.forEach((snap) => snap.forEach((d) => { map[d.id] = d.data(); }));
+
+  const pick = (...vals) => vals.find((v) => v && v !== "NA" && v !== "N/A") || "";
+
+  return report.map((member) => ({
+    ...member,
+    marriages: (member.marriages || []).map((x) => {
+      const cm = map[x.closingMemberId];
+      if (!cm) return x;
+      return {
+        ...x,
+        closingMemberName: pick(x.closingMemberName, cm.displayName),
+        closingFatherName: pick(x.closingFatherName, cm.fatherName),
+        closingVillage: pick(x.closingVillage, cm.village),
+        closingState: pick(cm.state, x.closingState),
+        closingPhone: pick(x.closingPhone, cm.phone),
+        closingRegNo: pick(x.closingRegNo, cm.registrationNumber),
+        closingApplicationNumber: pick(x.closingApplicationNumber, cm.applicationNumber),
+        closingGuardian: pick(cm.guardian, x.closingGuardian),
+        closingGuardianRelation: pick(cm.guardianRelation, x.closingGuardianRelation),
+      };
+    }),
+  }));
 }
 
 

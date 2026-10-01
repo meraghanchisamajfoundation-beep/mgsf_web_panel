@@ -165,9 +165,9 @@ const styles = StyleSheet.create({
   tableCellLast: { borderRightWidth: 0 },
 
   // Column widths
-  cSerial: { width: '9%',  alignItems: 'center' },
-  cCode:   { width: '11%', alignItems: 'center' },
-  cName:   { width: '54%' },
+  cSerial: { width: '8%',  alignItems: 'center' },
+  cCode:   { width: '10%', alignItems: 'center' },
+  cName:   { width: '56%' },
   cPhone:  { width: '14%', alignItems: 'center' },
   cDate:   { width: '12%', alignItems: 'center' },
 
@@ -200,6 +200,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   amountText: { fontSize: 11, fontWeight: 'bold', color: RED },
+  amountCol:  { flexDirection: 'column', alignItems: 'flex-start' },
+  amountCaption: { fontSize: 6.5, color: TEXTGREY, fontWeight: 'bold', marginBottom: 1.5 },
+  grandTotalText: { fontSize: 7.5, color: RED, fontWeight: 'bold', marginTop: 2 },
   agentBox:   { alignItems: 'flex-end' },
   agentLabelRow: { flexDirection: 'row' },
   agentLabel: { fontSize: 7, color: '#000' },
@@ -285,13 +288,15 @@ const formatReceiptNo = (seq, prefix = '') => {
 };
 
 // ─── Name cell builder ─────────────────────────────────────────────────────
-// Reference format: "सुरेश जी /मोहन लाल जी कोरना राजस्थान (सीता देवी)"
-//                    name    /father        village state   (guardian)
-const buildRowName = (row = {}) => {
+// Format: "सुरेश जी /मोहन लाल जी कोरना राजस्थान (वारिसदार: सीता देवी पत्नी)"
+//          name    /father        village state  (heir name + relation)
+// holderLabel is 'हकदार' for the Mamera program, 'वारिसदार' otherwise.
+const buildRowName = (row = {}, holderLabel = 'वारिसदार') => {
   if (!row.name && !row.fatherName) return '';
   const head = row.fatherName ? `${row.name || ''} /${row.fatherName}` : (row.name || '');
   const place = [row.address, row.state].filter(Boolean).join(' ');
-  const holder = row.guardian ? `(${row.guardian})` : '';
+  const heir = [row.guardian, row.guardianRelation].filter(Boolean).join(' ');
+  const holder = row.guardian ? `(${holderLabel}: ${heir})` : '';
   return [head, place, holder].filter(Boolean).join(' ');
 };
 
@@ -419,7 +424,7 @@ const ReceiptPage = ({ receiptData, pageData, programInfo, paymentStatus = 'pend
                     <Text style={{ textAlign: 'center' }}>{row.regNo ? String(row.regNo) : ''}</Text>
                   </View>
                   <View style={[styles.tableCell, styles.cName]}>
-                    <Text>{buildRowName(row)}</Text>
+                    <Text>{buildRowName(row, programInfo?.isMamera ? 'हकदार' : 'वारिसदार')}</Text>
                   </View>
                   <View style={[styles.tableCell, styles.cPhone]}>
                     <Text style={{ textAlign: 'center' }}>{row.phone || ''}</Text>
@@ -436,13 +441,28 @@ const ReceiptPage = ({ receiptData, pageData, programInfo, paymentStatus = 'pend
           <View style={styles.bottomGroup}>
           {/* ── Amount & Agent ── */}
           <View style={styles.totalSection}>
-            <View style={styles.amountBox}>
-              <View style={styles.rupeeChip}>
-                <Text style={styles.rupeeSign}>₹</Text>
+            {/* Amount = total of the closed members listed on THIS page.
+                When the list runs over several pages, each page shows its own
+                योग and the last page also shows the कुल योग of all pages. */}
+            <View style={styles.amountCol}>
+              {pageData.isMultiPage && (
+                <Text style={styles.amountCaption}>
+                  इस पृष्ठ का योग ({pageData.pageRowCount} सदस्य)
+                </Text>
+              )}
+              <View style={styles.amountBox}>
+                <View style={styles.rupeeChip}>
+                  <Text style={styles.rupeeSign}>₹</Text>
+                </View>
+                <View style={styles.amountChip}>
+                  <Text style={styles.amountText}>{pageData.amount}</Text>
+                </View>
               </View>
-              <View style={styles.amountChip}>
-                <Text style={styles.amountText}>{pageData.amount}</Text>
-              </View>
+              {pageData.isMultiPage && pageData.isLastPage && (
+                <Text style={styles.grandTotalText}>
+                  कुल योग ({pageData.totalRowCount} सदस्य): {pageData.grandTotal}
+                </Text>
+              )}
             </View>
             <View style={styles.agentBox}>
               <View style={styles.agentLabelRow}>
@@ -665,6 +685,7 @@ const VivahMemoPDF = ({
           address: m.closingVillage || '',
           state: getStateLabel(m.closingState),
           guardian: m.closingGuardian || '',
+          guardianRelation: m.closingGuardianRelation || '',
           phone: m.closingPhone || '-',
           date: formatShortDate(m.marriageDate, '-'),
         }));
@@ -678,7 +699,15 @@ const VivahMemoPDF = ({
             receiptData={memberReceiptData}
             pageData={{
               pageNum: `${chunkIdx + 1}/${totalPages}`,
-              amount: formatCurrency(totalAmount),
+              // Page-wise total: only the closings printed on this page
+              amount: formatCurrency(
+                chunk.reduce((sum, m) => sum + (parseFloat(m.amount) || 0), 0)
+              ),
+              pageRowCount: chunk.length,
+              grandTotal: formatCurrency(totalAmount),
+              totalRowCount: marriages.length,
+              isMultiPage: totalPages > 1,
+              isLastPage: chunkIdx === totalPages - 1,
               rows,
             }}
             programInfo={programInfo}

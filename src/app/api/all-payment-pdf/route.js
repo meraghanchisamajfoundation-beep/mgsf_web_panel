@@ -22,7 +22,7 @@ export async function POST(req) {
   try {
     const { rowData, agentInfo, paymentStatus = "all" } = await req.json();
 
-    const mode = ["pending", "paid"].includes(paymentStatus)
+    const mode = ["pending", "paid", "closed", "closed_paid", "closed_pending"].includes(paymentStatus)
       ? paymentStatus
       : "all";
 

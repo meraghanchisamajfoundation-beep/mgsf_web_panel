@@ -122,12 +122,21 @@ const AllPaymentPdf = ({ rowData = [], agentInfo = {}, paymentStatus = 'all' }) 
 
   // 'all' | 'pending' | 'paid' | 'closed' — the caller already filters, but
   // filter again so the document is correct no matter who renders it.
-  const mode = ['pending', 'paid', 'closed'].includes(paymentStatus) ? paymentStatus : 'all';
-  const isClosedReport = mode === 'closed';
+  const mode = ['pending', 'paid', 'closed', 'closed_paid', 'closed_pending'].includes(paymentStatus)
+    ? paymentStatus : 'all';
+  const isClosedReport = mode.startsWith('closed');
+  // Pending-only list: paid amount is not printed (column + summary lines),
+  // columns then add up to 100%.
+  const hidePaid = mode === 'pending';
+  const programColStyle = hidePaid ? { width: '19%' } : null;
 
   const rows = (
     mode === 'pending' ? rowData.filter((r) => (r.pendingCount || 0) > 0)
     : mode === 'paid'  ? rowData.filter((r) => (r.paidCount    || 0) > 0)
+    : mode === 'closed_paid'
+      ? rowData.filter((r) => r.isClosed && (r.contributorsPaid || 0) > 0 && (r.contributorsPending || 0) === 0)
+    : mode === 'closed_pending'
+      ? rowData.filter((r) => r.isClosed && (r.contributorsPending || 0) > 0)
     : isClosedReport   ? rowData.filter((r) => r.isClosed)
     : rowData
   ).map((r, i) => ({ ...r, index: r.index ?? i + 1 }));
@@ -137,6 +146,8 @@ const AllPaymentPdf = ({ rowData = [], agentInfo = {}, paymentStatus = 'all' }) 
     pending: { title: 'बकाया भुगतान सूची',        tag: 'केवल बकाया' },
     paid:    { title: 'भुगतान की गई सूची',        tag: 'केवल भुगतान' },
     closed:  { title: 'समापन सदस्य सूची',         tag: 'जिनका समापन हो चुका' },
+    closed_pending: { title: 'समापन सदस्य - बकाया सूची',   tag: 'जिनकी राशि शेष है' },
+    closed_paid:    { title: 'समापन सदस्य - पूर्ण भुगतान सूची', tag: 'पूरी राशि प्राप्त' },
   }[mode];
 
   const totalPaid         = rows.reduce((s, r) => s + (r.totalPaid    || 0), 0);
@@ -290,15 +301,17 @@ const AllPaymentPdf = ({ rowData = [], agentInfo = {}, paymentStatus = 'all' }) 
       <View style={[styles.tableHeaderCell, styles.colPhone]}>
         <Text style={[styles.textCenter, styles.smallTableText]}>फोन नं.</Text>
       </View>
-      <View style={[styles.tableHeaderCell, styles.colProgram]}>
+      <View style={[styles.tableHeaderCell, styles.colProgram, programColStyle]}>
         <Text style={[styles.textLeft, styles.smallTableText]}>योजना</Text>
       </View>
       <View style={[styles.tableHeaderCell, styles.colAmountPending]}>
         <Text style={[styles.textRight, styles.smallTableText]}>बकाया राशि</Text>
       </View>
-      <View style={[styles.tableHeaderCell, styles.colAmountPaid]}>
-        <Text style={[styles.textRight, styles.smallTableText]}>भुगतान राशि</Text>
-      </View>
+      {!hidePaid && (
+        <View style={[styles.tableHeaderCell, styles.colAmountPaid]}>
+          <Text style={[styles.textRight, styles.smallTableText]}>भुगतान राशि</Text>
+        </View>
+      )}
       <View style={[styles.tableHeaderCell, styles.colStatus, { borderRightWidth: 0 }]}>
         <Text style={[styles.textCenter, styles.smallTableText]}>स्थिति</Text>
       </View>
@@ -308,7 +321,7 @@ const AllPaymentPdf = ({ rowData = [], agentInfo = {}, paymentStatus = 'all' }) 
   const TableRow = ({ row, index }) => {
     const hasPaid    = row.totalPaid    > 0;
     const hasPending = row.totalPending > 0;
-    const hasBoth    = row.status === 'both';
+    const hasBoth    = !hidePaid && row.status === 'both';
 
     return (
       <View style={[styles.tableRow, index % 2 === 1 && styles.tableRowAlt]}>
@@ -330,7 +343,7 @@ const AllPaymentPdf = ({ rowData = [], agentInfo = {}, paymentStatus = 'all' }) 
         <View style={[styles.tableCell, styles.colPhone]}>
           <Text style={[styles.textCenter, styles.smallTableText]}>{row.phone || '-'}</Text>
         </View>
-        <View style={[styles.tableCell, styles.colProgram]}>
+        <View style={[styles.tableCell, styles.colProgram, programColStyle]}>
           <Text style={[styles.textLeft, styles.boldTableText, { color: '#8B0000' }]}>{row.programName || '-'}</Text>
         </View>
         <View style={[styles.tableCell, styles.colAmountPending]}>
@@ -338,17 +351,19 @@ const AllPaymentPdf = ({ rowData = [], agentInfo = {}, paymentStatus = 'all' }) 
             {hasPending ? formatCurrency(row.totalPending) : '-'}
           </Text>
         </View>
-        <View style={[styles.tableCell, styles.colAmountPaid]}>
-          <Text style={[styles.textRight, styles.boldTableText, { color: hasPaid ? '#52c41a' : '#d9d9d9' }]}>
-            {hasPaid ? formatCurrency(row.totalPaid) : '-'}
-          </Text>
-        </View>
+        {!hidePaid && (
+          <View style={[styles.tableCell, styles.colAmountPaid]}>
+            <Text style={[styles.textRight, styles.boldTableText, { color: hasPaid ? '#52c41a' : '#d9d9d9' }]}>
+              {hasPaid ? formatCurrency(row.totalPaid) : '-'}
+            </Text>
+          </View>
+        )}
         <View style={[styles.tableCell, styles.colStatus, { borderRightWidth: 0 }]}>
           {hasBoth ? (
             <View style={{ backgroundColor: '#fa8c16', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 2 }}>
               <Text style={{ fontSize: 6, color: '#fff', fontWeight: 'bold' }}>Both</Text>
             </View>
-          ) : hasPaid ? (
+          ) : hasPaid && !hidePaid ? (
             <View style={{ backgroundColor: '#52c41a', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 2 }}>
               <Text style={{ fontSize: 6, color: '#fff', fontWeight: 'bold' }}>Paid</Text>
             </View>
@@ -381,9 +396,9 @@ const AllPaymentPdf = ({ rowData = [], agentInfo = {}, paymentStatus = 'all' }) 
             ...(mode === 'all'
               ? [['बिना किसी भुगतान वाले सदस्य:', noPaymentMembers.toString(), '#8c8c8c']]
               : []),
-            ['भुगतान लेनदेन:',           totalPaidCount.toString(),        '#52c41a'],
+            ...(hidePaid ? [] : [['भुगतान लेनदेन:', totalPaidCount.toString(), '#52c41a']]),
             ['बकाया लेनदेन:',            totalPendingCount.toString(),     '#faad14'],
-            ['कुल भुगतान राशि:',         formatCurrency(totalPaid),        '#52c41a'],
+            ...(hidePaid ? [] : [['कुल भुगतान राशि:', formatCurrency(totalPaid), '#52c41a']]),
           ]
       ).map(([label, value, color]) => (
         <View key={label} style={styles.summaryRow}>
