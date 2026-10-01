@@ -295,7 +295,7 @@ const buildRowName = (row = {}, holderLabel = 'वारिसदार') => {
   if (!row.name && !row.fatherName) return '';
   const head = row.fatherName ? `${row.name || ''} /${row.fatherName}` : (row.name || '');
   const place = [row.address, row.state].filter(Boolean).join(' ');
-  const heir = [row.guardian, row.guardianRelation].filter(Boolean).join(' ');
+  const heir = [row.guardianRelation].filter(Boolean).join(' ');
   const holder = row.guardian ? `(${holderLabel}: ${heir})` : '';
   return [head, place, holder].filter(Boolean).join(' ');
 };

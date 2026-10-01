@@ -406,7 +406,7 @@ const RegFormPdf = ({data, selectedProgram}) => {
               <View style={styles.fullRow}>
                 <View style={styles.field}>
                   <Text style={styles.label}>पिता/पति का नाम:</Text>
-                  <Text style={styles.value}>{data.fatherName + " "}</Text>
+                  <Text style={styles.value}>{data.fatherName + " " + " "}</Text>
                 </View>
               </View>
 

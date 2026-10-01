@@ -633,7 +633,9 @@ export async function getAgentMemberPaystatus({
   const URl = process.env.NEXT_PUBLIC_GET_AGENT_PAY_STATUS_URL;
 
   // Build URL with query params
-  let url = `${URl}?userId=${userId}&programId=${programId}&agentId=${agentId}`;
+  // compact=1 → server sends closing details once per closing (much smaller
+  // response, less function memory); we expand them back below.
+  let url = `${URl}?userId=${userId}&programId=${programId}&agentId=${agentId}&compact=1`;
   if (closingGroupId && closingGroupId !== 'all') {
     url += `&closingGroupId=${closingGroupId}`;
   }
@@ -651,7 +653,22 @@ export async function getAgentMemberPaystatus({
     throw new Error(err.message || "Request failed");
   }
 
-  return res.json();
+  const data = await res.json();
+
+  // Expand compact rows → full marriage objects (same shape the UI/PDF use)
+  if (data?.compact && data.closings && Array.isArray(data.report)) {
+    const closings = data.closings;
+    data.report = data.report.map((member) => ({
+      ...member,
+      marriages: (member.marriages || []).map((m) => ({
+        ...m,
+        payerMemberId: member.memberId,
+        ...(closings[m.closingMemberId] || {}),
+      })),
+    }));
+    delete data.closings;
+  }
+  return data;
 }
 
 

@@ -96,7 +96,9 @@ const { generatePdf } = usePdfGenerator();
         // member docs (payment entries don't store them). If this lookup
         // fails we still show the report without those fields.
         let report = data.report || [];
-        try {
+        // New function version (compact) already includes वारिसदार etc.;
+        // only the old version needs the extra Firestore lookup.
+        if (!data.compact) try {
           report = await attachClosingMemberDetails({
             userId: user.uid,
             programId: selectedProgram.id,
