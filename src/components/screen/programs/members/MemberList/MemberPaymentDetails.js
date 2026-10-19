@@ -27,20 +27,24 @@ import {
     WalletOutlined,
     DownloadOutlined,
     TeamOutlined,
-    FolderOpenOutlined
+    FolderOpenOutlined,
+    ToolOutlined
 } from '@ant-design/icons';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthProvider';
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import SingleMemberPendingPaymentPdf from './PendingPaymentPdf';
+import MemberPaymentCorrection from './MemberPaymentCorrection';
 import { useSelector } from 'react-redux';
 import dayjs from 'dayjs';
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
 
-function MemberPaymentDetails({ visible, onClose, memberData, paymentReport, loading = false }) {
+function MemberPaymentDetails({ visible, onClose, memberData, paymentReport, loading = false, onChanged }) {
     const [activeTab, setActiveTab] = useState('1');
+    // "Correct Payments" — compare this member's entries with the closing list
+    const [correctionOpen, setCorrectionOpen] = useState(false);
     const TrustData =useSelector(state => state.data.trustData) 
     console.log(paymentReport,'paymentReport')
     const selectedProgram = useSelector((state) => state.data.selectedProgram);
@@ -214,12 +218,17 @@ function MemberPaymentDetails({ visible, onClose, memberData, paymentReport, loa
                 </div>
             }
             placement="right"
-            width={700}
+            width={860}
             onClose={onClose}
             open={visible}
             loading={loading}
             extra={
                 <div className='flex items-center gap-2'>
+                    <Tooltip title="Find missing / extra closing entries for this member and fix them">
+                        <Button icon={<ToolOutlined />} onClick={() => setCorrectionOpen(true)}>
+                            Correct Payments
+                        </Button>
+                    </Tooltip>
                     <Tooltip
                         title={pendingCount === 0 ? 'No pending payments for this member' : ''}
                     >
@@ -373,6 +382,13 @@ function MemberPaymentDetails({ visible, onClose, memberData, paymentReport, loa
                     )}
                 />
             </Card>
+
+            <MemberPaymentCorrection
+                open={correctionOpen}
+                onClose={() => setCorrectionOpen(false)}
+                memberData={member}
+                onChanged={onChanged}
+            />
 
         <Drawer
                 title={getFileName()}

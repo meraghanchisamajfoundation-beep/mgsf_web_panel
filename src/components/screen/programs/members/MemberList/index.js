@@ -956,6 +956,16 @@ const MemberList = () => {
                 memberData={selectedMember}
                 paymentReport={paymentReport}
                 loading={loadingReport}
+                onChanged={async () => {
+                    // silent refresh after a correction (no drawer skeleton)
+                    if (!selectedMember) return;
+                    try {
+                        const res = await fetchSingleMemberMarriageReport({
+                            userId: user.uid, programId: selectedProgram.id, memberId: selectedMember.id
+                        });
+                        setPaymentReport(res);
+                    } catch (e) { console.error(e); }
+                }}
             />
         </div>
     );
